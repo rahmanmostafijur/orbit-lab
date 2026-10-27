@@ -46,6 +46,13 @@ export function DiagramUniverse({
   const [failed, setFailed] = useState(false);
 
   const supported = useMemo(() => isClient && supportsWebGL(), [isClient]);
+  const quality: "high" | "low" = useMemo(
+    () =>
+      isClient && typeof window !== "undefined" && window.innerWidth < 768
+        ? "low"
+        : "high",
+    [isClient],
+  );
 
   if (!isClient) {
     return (
@@ -80,6 +87,7 @@ export function DiagramUniverse({
         selection={selection}
         pathEdgeIds={pathEdgeIds}
         reducedMotion={reducedMotion}
+        quality={quality}
         onSelectNode={onSelectNode}
       />
     </div>

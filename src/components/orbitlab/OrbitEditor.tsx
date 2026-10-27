@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Box, Layers, MousePointerClick, Spline } from "lucide-react";import { GraphStage } from "@/components/orbitlab/GraphStage";
+import {
+  Box,
+  Layers,
+  MousePointerClick,
+  SlidersHorizontal,
+  Spline,
+} from "lucide-react";
+import { GraphStage } from "@/components/orbitlab/GraphStage";
 import { Inspector } from "@/components/orbitlab/Inspector";
 import { FlowTrace } from "@/components/orbitlab/FlowTrace";
 import { WorkspaceSidebar } from "@/components/orbitlab/WorkspaceSidebar";
@@ -57,6 +64,7 @@ export function OrbitEditor() {
     workspaceTemplates[0].id,
   );
   const [status, setStatus] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const statusTimerRef = useRef<number>(0);
   const hydratedRef = useRef(false);
 
@@ -67,6 +75,22 @@ export function OrbitEditor() {
   }, []);
 
   useEffect(() => () => window.clearTimeout(statusTimerRef.current), []);
+
+  // Mobile tools drawer: Esc to close, lock page scroll while open.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setDrawerOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    document.body.classList.add("editor-drawer-open");
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.classList.remove("editor-drawer-open");
+    };
+  }, [drawerOpen]);
 
   // One-time hydration from localStorage or a shared #diagram= link.
   // Deferred via timeout so state updates stay inside a callback, not the effect body.
@@ -287,7 +311,17 @@ export function OrbitEditor() {
   );
 
   return (
-    <div className="workspace">
+    <div className={`workspace${drawerOpen ? " is-drawer-open" : ""}`}>
+      {drawerOpen ? (
+        <button
+          type="button"
+          className="workspace-drawer-backdrop is-open"
+          aria-hidden="true"
+          tabIndex={-1}
+          onClick={() => setDrawerOpen(false)}
+        />
+      ) : null}
+
       <WorkspaceSidebar
         workspace={workspace}
         activeTemplateId={activeTemplateId}
@@ -357,6 +391,17 @@ export function OrbitEditor() {
               3D universe
             </button>
           </div>
+
+          <button
+            type="button"
+            className={`workspace-toolbar__mode workspace-toolbar__drawer-toggle${drawerOpen ? " is-active" : ""}`}
+            aria-expanded={drawerOpen}
+            aria-controls="workspace-tools"
+            onClick={() => setDrawerOpen((open) => !open)}
+          >
+            <SlidersHorizontal size={15} strokeWidth={1.7} aria-hidden="true" />
+            Tools
+          </button>
         </header>
 
         <div className="workspace-stage">

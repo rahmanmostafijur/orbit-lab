@@ -77,7 +77,7 @@ export function WorkspaceSidebar({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <aside className="workspace-side" aria-label="Workspace controls">
+    <aside id="workspace-tools" className="workspace-side" aria-label="Workspace controls">
       <label className="field">
         <span className="field__label">Workspace name</span>
         <input

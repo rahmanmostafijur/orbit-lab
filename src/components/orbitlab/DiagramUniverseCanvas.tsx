@@ -17,6 +17,7 @@ type DiagramUniverseCanvasProps = {
   selection: DiagramSelection;
   pathEdgeIds: string[] | null;
   reducedMotion: boolean;
+  quality: "high" | "low";
   onSelectNode: (id: string) => void;
 };
 
@@ -74,9 +75,11 @@ export default function DiagramUniverseCanvas({
   selection,
   pathEdgeIds,
   reducedMotion,
+  quality,
   onSelectNode,
 }: DiagramUniverseCanvasProps) {
   const labelRefs = useRef(new Map<string, HTMLButtonElement>());
+  const isLowQuality = quality === "low";
 
   const positions = useMemo(
     () => new Map(workspace.nodes.map((node, index) => [node.id, mapNodePosition(node, index)])),
@@ -98,8 +101,12 @@ export default function DiagramUniverseCanvas({
     <div className="universe-view__stage">
       <Canvas
         camera={{ position: [0, 1.6, 11.5], fov: 45 }}
-        dpr={[1, 1.6]}
-        gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
+        dpr={[1, isLowQuality ? 1.15 : 1.6]}
+        gl={{
+          alpha: true,
+          antialias: !isLowQuality,
+          powerPreference: isLowQuality ? undefined : "high-performance",
+        }}
       >
         <color attach="background" args={["#03050b"]} />
         <fog attach="fog" args={["#03050b", 12, 34]} />
@@ -108,7 +115,15 @@ export default function DiagramUniverseCanvas({
         <pointLight position={[-5, -3, 4]} intensity={14} color="#f2bd82" />
 
         <Suspense fallback={null}>
-          <Stars radius={60} depth={40} count={1300} factor={3.4} saturation={0} fade speed={0.4} />
+          <Stars
+            radius={60}
+            depth={40}
+            count={isLowQuality ? 550 : 1300}
+            factor={3.4}
+            saturation={0}
+            fade
+            speed={0.4}
+          />
         </Suspense>
 
         <OrbitControls
@@ -148,7 +163,7 @@ export default function DiagramUniverseCanvas({
                   onSelectNode(node.id);
                 }}
               >
-                <sphereGeometry args={[0.34, 24, 24]} />
+                <sphereGeometry args={[0.34, isLowQuality ? 14 : 24, isLowQuality ? 14 : 24]} />
                 <meshStandardMaterial
                   color="#0a1a2e"
                   emissive={meta.color}

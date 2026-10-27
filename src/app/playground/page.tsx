@@ -21,6 +21,9 @@ export default function PlaygroundPage() {
         className="app-main"
         aria-label="OrbitLab diagram playground"
       >
+        <h1 className="visually-hidden">
+          Architecture playground — build, connect, and trace diagrams
+        </h1>
         <OrbitEditor />
       </main>
       <SiteFooter />

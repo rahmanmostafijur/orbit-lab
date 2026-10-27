@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
+  <title id="title">OrbitLab — Interactive architecture playground</title>
+  <desc id="description">Dark orbital artwork with cyan and amber light, introducing OrbitLab, a playground for designing software architecture.</desc>
+  <defs>
+    <radialGradient id="bg" cx="72%" cy="44%" r="76%">
+      <stop offset="0" stop-color="#102441"/>
+      <stop offset=".5" stop-color="#070c18"/>
+      <stop offset="1" stop-color="#02040a"/>
+    </radialGradient>
+    <radialGradient id="planet" cx="35%" cy="30%" r="72%">
+      <stop offset="0" stop-color="#b4f7ff"/>
+      <stop offset=".24" stop-color="#3cacd6"/>
+      <stop offset=".66" stop-color="#0a2b51"/>
+      <stop offset="1" stop-color="#030812"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="0" x2="1">
+      <stop offset="0" stop-color="#66e6ff" stop-opacity="0"/>
+      <stop offset=".36" stop-color="#66e6ff" stop-opacity=".9"/>
+      <stop offset=".7" stop-color="#f2bb7c" stop-opacity=".7"/>
+      <stop offset="1" stop-color="#f2bb7c" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="14" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M60 0H0V60" fill="none" stroke="#7dd3fc" stroke-opacity=".05"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <circle cx="862" cy="315" r="220" fill="#0c72a3" opacity=".24" filter="url(#glow)"/>
+  <circle cx="862" cy="315" r="112" fill="url(#planet)" stroke="#8beaff" stroke-opacity=".35" stroke-width="1.5"/>
+  <g transform="translate(862 315) rotate(-16)">
+    <ellipse rx="262" ry="76" fill="none" stroke="url(#ring)" stroke-width="3" filter="url(#glow)"/>
+    <ellipse rx="200" ry="57" fill="none" stroke="#7fe9ff" stroke-opacity=".14"/>
+    <circle cx="-262" cy="0" r="6" fill="#f3bd83" filter="url(#glow)"/>
+    <circle cx="182" cy="-54" r="3.5" fill="#7fe9ff" filter="url(#glow)"/>
+    <line x1="-180" y1="-30" x2="60" y2="40" stroke="#7fe9ff" stroke-opacity=".5" stroke-width="2" stroke-dasharray="8 7"/>
+    <line x1="60" y1="40" x2="196" y2="-20" stroke="#f3bd83" stroke-opacity=".5" stroke-width="2" stroke-dasharray="6 8"/>
+  </g>
+  <g opacity=".6" fill="#c7f5ff">
+    <circle cx="128" cy="115" r="1.5"/>
+    <circle cx="1042" cy="121" r="2"/>
+    <circle cx="1112" cy="508" r="1.5"/>
+    <circle cx="306" cy="505" r="1"/>
+    <circle cx="580" cy="88" r="1"/>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="72" y="158" fill="#8ea2bd" font-size="14" letter-spacing="5">ORBITLAB / ARCHITECTURE PLAYGROUND</text>
+    <text x="68" y="282" fill="#f4f1e8" font-size="78" font-weight="700" letter-spacing="-4">ORBIT</text>
+    <text x="68" y="362" fill="#f4f1e8" font-size="78" font-weight="700" letter-spacing="-4">LAB</text>
+    <text x="72" y="424" fill="#8ea2bd" font-size="18" letter-spacing="3">DESIGN SYSTEMS. TRACE REQUEST FLOWS. SHARE DIAGRAMS.</text>
+    <text x="72" y="548" fill="#8ea2bd" font-size="13" letter-spacing="4">NEXT.JS / REACT THREE FIBER / THREE.JS</text>
+    <text x="72" y="580" fill="#f3bd83" font-size="11" letter-spacing="3">WORKS IN YOUR BROWSER — NO ACCOUNT NEEDED</text>
+  </g>
+  <path d="M72 68V46h36M1092 46h36v22M72 562v22h36M1128 584h-36v-22" fill="none" stroke="#d8ecff" stroke-opacity=".24"/>
+</svg>

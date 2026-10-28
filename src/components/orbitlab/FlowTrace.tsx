@@ -1,107 +1,96 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Play, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { OrbitWorkspace } from "@/lib/orbitlab/types";
-import { findPathEdges } from "@/lib/orbitlab/model";
+import { pathNodeIds } from "@/lib/orbitlab/model";
+
+export type TraceState = { from: string | null; to: string | null; directed: boolean };
 
 type FlowTraceProps = {
   workspace: OrbitWorkspace;
+  trace: TraceState;
+  /** null = not run yet, [] = no path, otherwise the edge ids of the route. */
   pathEdgeIds: string[] | null;
-  onSelectPath: (pathEdgeIds: string[] | null) => void;
+  onChange: (trace: TraceState) => void;
 };
 
-export function FlowTrace({
-  workspace,
-  pathEdgeIds,
-  onSelectPath,
-}: FlowTraceProps) {
-  const [fromId, setFromId] = useState<string>("");
-  const [toId, setToId] = useState<string>("");
+export function FlowTrace({ workspace, trace, pathEdgeIds, onChange }: FlowTraceProps) {
+  const labelOf = (id: string | null) =>
+    workspace.nodes.find((node) => node.id === id)?.label ?? "…";
 
-  const resolvedFrom = fromId || workspace.nodes[0]?.id || "";
-  const resolvedTo = toId || workspace.nodes[workspace.nodes.length - 1]?.id || "";
+  let message: string;
+  if (!trace.from) {
+    message = "Click a source component.";
+  } else if (!trace.to) {
+    message = `From ${labelOf(trace.from)} — now click a destination.`;
+  } else if (pathEdgeIds && pathEdgeIds.length > 0) {
+    const route = pathNodeIds(workspace.edges, trace.from, pathEdgeIds).map(labelOf).join(" → ");
+    const hops = pathEdgeIds.length;
+    message = `${route} · ${hops} hop${hops === 1 ? "" : "s"}${trace.directed ? "" : " (ignoring direction)"}`;
+  } else {
+    message = `No forward path from ${labelOf(trace.from)} to ${labelOf(trace.to)}. Connections are one-way.`;
+  }
 
-  const hops = useMemo(() => {
-    if (!resolvedFrom || !resolvedTo) return null;
-    const path = findPathEdges(workspace.edges, resolvedFrom, resolvedTo);
-    return path?.length ?? null;
-  }, [workspace.edges, resolvedFrom, resolvedTo]);
-
-  const active = pathEdgeIds?.length ?? 0;
+  const noPath = Boolean(trace.from && trace.to && pathEdgeIds?.length === 0);
 
   return (
-    <section className="panel panel--trace" aria-label="Request flow tracer">
-      <div className="panel__heading">
-        <p className="micro-label">Request flow</p>
-        {pathEdgeIds ? (
+    <section className="trace-overlay" aria-label="Request flow tracer">
+      <p className="trace-overlay__status" aria-live="polite">
+        {message}
+      </p>
+
+      <div className="trace-overlay__row">
+        <label className="trace-overlay__field">
+          <span className="visually-hidden">From</span>
+          <select
+            value={trace.from ?? ""}
+            onChange={(event) => onChange({ ...trace, from: event.target.value || null })}
+          >
+            <option value="">From…</option>
+            {workspace.nodes.map((node) => (
+              <option key={node.id} value={node.id}>
+                {node.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span aria-hidden="true">→</span>
+        <label className="trace-overlay__field">
+          <span className="visually-hidden">To</span>
+          <select
+            value={trace.to ?? ""}
+            onChange={(event) => onChange({ ...trace, to: event.target.value || null })}
+          >
+            <option value="">To…</option>
+            {workspace.nodes.map((node) => (
+              <option key={node.id} value={node.id}>
+                {node.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {trace.from ? (
           <button
             type="button"
             className="button button--ghost button--sm"
-            onClick={() => onSelectPath(null)}
+            onClick={() => onChange({ from: null, to: null, directed: true })}
           >
             <X size={14} strokeWidth={1.7} aria-hidden="true" />
-            Clear
+            Clear trace
           </button>
         ) : null}
       </div>
 
-      <div className="trace__fields">
-        <label className="field">
-          <span className="field__label">From</span>
-          <select value={resolvedFrom} onChange={(event) => {
-            setFromId(event.target.value);
-            onSelectPath(null);
-          }}>
-            {workspace.nodes.map((node) => (
-              <option key={node.id} value={node.id}>
-                {node.label}
-              </option>
-            ))}
-          </select>
+      {noPath || !trace.directed ? (
+        <label className="trace-overlay__toggle">
+          <input
+            type="checkbox"
+            checked={!trace.directed}
+            onChange={(event) => onChange({ ...trace, directed: !event.target.checked })}
+          />
+          Trace ignoring direction
         </label>
-
-        <label className="field">
-          <span className="field__label">To</span>
-          <select value={resolvedTo} onChange={(event) => {
-            setToId(event.target.value);
-            onSelectPath(null);
-          }}>
-            {workspace.nodes.map((node) => (
-              <option key={node.id} value={node.id}>
-                {node.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <button
-        type="button"
-        className="button button--primary button--block"
-        disabled={!resolvedFrom || !resolvedTo || resolvedFrom === resolvedTo}
-        onClick={() => {
-          const path = findPathEdges(workspace.edges, resolvedFrom, resolvedTo);
-          if (!path) {
-            onSelectPath([]);
-            return;
-          }
-          onSelectPath(path);
-        }}
-      >
-        <Play size={15} strokeWidth={1.8} aria-hidden="true" />
-        Trace request path
-      </button>
-
-      <p className="trace__status" aria-live="polite">
-        {pathEdgeIds && pathEdgeIds.length === 0
-          ? "No forward path between those components."
-          : active > 0
-            ? `Route found — ${active} hop${active === 1 ? "" : "s"} flowing.`
-            : hops !== null
-              ? `Shortest route: ${hops} hop${hops === 1 ? "" : "s"}.`
-              : "Pick two components to trace an animated request route."}
-      </p>
+      ) : null}
     </section>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import type {
   ComponentKind,
   DiagramSelection,
@@ -14,6 +14,8 @@ type InspectorProps = {
   onUpdateNode: (id: string, changes: { kind?: ComponentKind; label?: string; note?: string }) => void;
   onUpdateEdge: (id: string, changes: { label?: string; note?: string }) => void;
   onDeleteSelection: () => void;
+  /** Deselect; closes the bottom sheet on small screens. */
+  onClose: () => void;
 };
 
 export function Inspector({
@@ -22,6 +24,7 @@ export function Inspector({
   onUpdateNode,
   onUpdateEdge,
   onDeleteSelection,
+  onClose,
 }: InspectorProps) {
   const node =
     selection.type === "node"
@@ -38,24 +41,34 @@ export function Inspector({
         <p className="micro-label">Inspector</p>
         <p className="panel__empty">
           Select a component or connection on the canvas to edit its label,
-          notes, or type. Connections can also be traced from here.
+          notes, or type. Use Trace mode to follow a request.
         </p>
       </section>
     );
   }
 
   return (
-    <section className="panel panel--inspector" aria-label="Inspector">
+    <section className="panel panel--inspector is-open" aria-label="Inspector">
       <div className="panel__heading">
         <p className="micro-label">Inspector</p>
-        <button
-          type="button"
-          className="button button--ghost button--sm"
-          onClick={onDeleteSelection}
-        >
-          <Trash2 size={14} strokeWidth={1.7} aria-hidden="true" />
-          Delete
-        </button>
+        <div className="panel__actions">
+          <button
+            type="button"
+            className="button button--ghost button--sm"
+            onClick={onDeleteSelection}
+          >
+            <Trash2 size={14} strokeWidth={1.7} aria-hidden="true" />
+            Delete
+          </button>
+          <button
+            type="button"
+            className="button button--ghost button--sm"
+            onClick={onClose}
+            aria-label="Close inspector"
+          >
+            <X size={14} strokeWidth={1.7} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       {node ? (

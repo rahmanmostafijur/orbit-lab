@@ -3869,6 +3869,7 @@ a {
 }
 
 .workspace-stage {
+  position: relative;
   min-width: 0;
 }
 
@@ -4028,6 +4029,10 @@ a {
   box-shadow: 0 0 0 2px var(--cyan-bright), 0 0 24px rgba(126, 232, 255, 0.4);
 }
 
+.orbit-node.is-on-path {
+  box-shadow: 0 0 0 2px var(--cyan), 0 0 28px rgba(126, 232, 255, 0.35);
+}
+
 .orbit-node.is-dragging {
   box-shadow: 0 22px 40px rgba(2, 6, 12, 0.7);
   transform: scale(1.02);
@@ -4141,10 +4146,63 @@ a {
   gap: 14px;
 }
 
-@media (min-width: 1060px) {
-  .workspace-panels {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+/* Inspector: right-hand column beside the canvas on wide screens, bottom sheet otherwise. */
+@media (min-width: 1180px) {
+  .workspace__main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+    align-items: start;
   }
+
+  .workspace-toolbar,
+  .workspace-meta {
+    grid-column: 1 / -1;
+  }
+
+  /* Fill the viewport so the canvas, inspector and toolbar all fit on a 768px-tall laptop. */
+  .stage__scroller {
+    height: clamp(420px, calc(100svh - var(--header-height) - 170px), 900px);
+  }
+
+  .workspace-panels {
+    position: sticky;
+    top: calc(var(--header-height) + 14px);
+    max-height: calc(100vh - var(--header-height) - 28px);
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 1179px) {
+  .panel--inspector:not(.is-open) {
+    display: none;
+  }
+
+  .panel--inspector.is-open {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 250;
+    max-height: 48svh;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom));
+    overflow-y: auto;
+    border-radius: 18px 18px 0 0;
+    background: var(--panel-solid);
+    box-shadow: 0 -24px 80px rgba(0, 0, 0, 0.55);
+    animation: sheet-in 280ms var(--ease-out);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
+.panel__actions {
+  display: flex;
+  gap: 6px;
 }
 
 .panel {
@@ -4775,5 +4833,79 @@ kbd {
   .shortcuts-list > div {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+}
+
+/* Trace overlay, pinned to the canvas (zoom controls sit top-right) */
+.trace-overlay {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  z-index: 7;
+  display: grid;
+  gap: 8px;
+  max-width: min(560px, calc(100% - 132px));
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: rgba(7, 12, 24, 0.9);
+  box-shadow: 0 14px 40px rgba(2, 6, 12, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+.trace-overlay__status {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.trace-overlay__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  color: var(--muted);
+}
+
+.trace-overlay__field select {
+  min-height: 36px;
+  max-width: 11rem;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--deep-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.trace-overlay__field select:focus-visible,
+.trace-overlay__toggle input:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.trace-overlay__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .trace-overlay {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel--inspector.is-open {
+    animation: none;
   }
 }

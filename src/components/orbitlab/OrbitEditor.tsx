@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Keyboard,
@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { GraphStage } from "@/components/orbitlab/GraphStage";
 import { Inspector } from "@/components/orbitlab/Inspector";
-import { FlowTrace } from "@/components/orbitlab/FlowTrace";
+import { FlowTrace, type TraceState } from "@/components/orbitlab/FlowTrace";
 import { WorkspaceSidebar } from "@/components/orbitlab/WorkspaceSidebar";
 import { DiagramUniverse } from "@/components/orbitlab/DiagramUniverse";
 import { ShortcutsDialog } from "@/components/orbitlab/ShortcutsDialog";
@@ -28,6 +28,7 @@ import {
   createId,
   decodeWorkspaceFromLink,
   duplicateNode,
+  findPathEdges,
   loadSavedWorkspace,
   moveNode,
   parseWorkspace,
@@ -46,6 +47,7 @@ import type {
 
 const TOAST_TIMEOUT = 4200;
 const UNDO_TOAST_TIMEOUT = 8000;
+const NO_TRACE: TraceState = { from: null, to: null, directed: true };
 
 const modes: { id: EditorMode; label: string; hint: string; key: string; icon: typeof Layers }[] = [
   { id: "edit", label: "Edit", hint: "Select and drag components", key: "v", icon: MousePointerClick },
@@ -73,7 +75,15 @@ export function OrbitEditor() {
   const [mode, setMode] = useState<EditorMode>("edit");
   const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
   const [view, setView] = useState<"2d" | "3d">("2d");
-  const [pathEdgeIds, setPathEdgeIds] = useState<string[] | null>(null);
+  const [trace, setTrace] = useState<TraceState>(NO_TRACE);
+  // Derived, so the highlighted route follows edits; [] means "no path".
+  const pathEdgeIds = useMemo(
+    () =>
+      trace.from && trace.to
+        ? findPathEdges(workspace.edges, trace.from, trace.to, trace.directed) ?? []
+        : null,
+    [workspace.edges, trace],
+  );
   const [toast, setToast] = useState<ToastState>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -112,7 +122,7 @@ export function OrbitEditor() {
       apply(() => next);
       setSelection({ type: "none" });
       setConnectingFrom(null);
-      setPathEdgeIds(null);
+      setTrace(NO_TRACE);
       showToast(message, { label: "Undo", run: () => apply(() => previous) });
     },
     [workspace, apply, showToast],
@@ -122,14 +132,14 @@ export function OrbitEditor() {
     setHistory(undo);
     setSelection({ type: "none" });
     setConnectingFrom(null);
-    setPathEdgeIds(null);
+    setTrace(NO_TRACE);
   }, []);
 
   const handleRedo = useCallback(() => {
     setHistory(redo);
     setSelection({ type: "none" });
     setConnectingFrom(null);
-    setPathEdgeIds(null);
+    setTrace(NO_TRACE);
   }, []);
 
   // Mobile tools drawer: Esc to close, lock page scroll while open.
@@ -221,7 +231,18 @@ export function OrbitEditor() {
   const handleNodeClick = useCallback(
     (id: string) => {
       setSelection({ type: "node", id });
-      setPathEdgeIds(null);
+
+      if (mode === "flow") {
+        // First click picks the source, second the destination (which runs the trace), third starts over.
+        setTrace((current) =>
+          current.from && !current.to && current.from !== id
+            ? { ...current, to: id }
+            : { ...NO_TRACE, directed: current.directed, from: id },
+        );
+        return;
+      }
+
+      setTrace(NO_TRACE);
 
       if (mode === "connect") {
         if (!connectingFrom) {
@@ -374,6 +395,7 @@ export function OrbitEditor() {
   const handleModeChange = useCallback((next: EditorMode) => {
     setMode(next);
     setConnectingFrom(null);
+    setTrace(NO_TRACE);
   }, []);
 
   // Global editor shortcuts. Skipped while typing so text fields keep their native undo and Backspace.
@@ -405,6 +427,7 @@ export function OrbitEditor() {
       } else if (event.key === "Escape") {
         setSelection({ type: "none" });
         setConnectingFrom(null);
+        setTrace(NO_TRACE);
       } else if (event.key === "?") {
         event.preventDefault();
         setShortcutsOpen(true);
@@ -541,7 +564,7 @@ export function OrbitEditor() {
             <GraphStage
               workspace={workspace}
               selection={selection}
-              connectingFrom={connectingFrom}
+              connectingFrom={mode === "flow" && !trace.to ? trace.from : connectingFrom}
               pathEdgeIds={pathEdgeIds}
               onNodeClick={handleNodeClick}
               onEdgeClick={handleEdgeClick}
@@ -556,20 +579,19 @@ export function OrbitEditor() {
               onSelectNode={(id) => setSelection({ type: "node", id })}
             />
           )}
+          {mode === "flow" ? (
+            <FlowTrace workspace={workspace} trace={trace} pathEdgeIds={pathEdgeIds} onChange={setTrace} />
+          ) : null}
         </div>
 
         <div className="workspace-panels">
-          <FlowTrace
-            workspace={workspace}
-            pathEdgeIds={pathEdgeIds}
-            onSelectPath={setPathEdgeIds}
-          />
           <Inspector
             workspace={workspace}
             selection={selection}
             onUpdateNode={handleUpdateNode}
             onUpdateEdge={handleUpdateEdge}
             onDeleteSelection={handleDeleteSelection}
+            onClose={handleBackgroundClick}
           />
         </div>
 
@@ -577,7 +599,7 @@ export function OrbitEditor() {
           <p aria-live="polite">
             {workspace.nodes.length} component{workspace.nodes.length === 1 ? "" : "s"} ·{" "}
             {workspace.edges.length} connection{workspace.edges.length === 1 ? "" : "s"}
-            {pathEdgeIds ? ` · ${pathEdgeIds.length} hop path highlighted` : ""}
+            {pathEdgeIds?.length ? ` · ${pathEdgeIds.length} hop path highlighted` : ""}
           </p>
           <p>
             <button

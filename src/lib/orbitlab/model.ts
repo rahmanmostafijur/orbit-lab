@@ -1,5 +1,4 @@
 import type { ComponentKind, DiagramEdge, DiagramNode, OrbitWorkspace } from "@/lib/orbitlab/types";
-import { createEmptyWorkspace } from "@/lib/orbitlab/templates";
 
 export const STORAGE_KEY = "orbitlab.workspace.v1";
 
@@ -139,14 +138,6 @@ export function loadSavedWorkspace(): OrbitWorkspace | null {
   }
 }
 
-export function clearSavedWorkspace() {
-  try {
-    window.localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // localStorage unavailable — nothing to clear.
-  }
-}
-
 export function encodeWorkspaceForLink(workspace: OrbitWorkspace): string {
   const json = serializeWorkspace(workspace);
   return encodeURIComponent(json);
@@ -264,17 +255,23 @@ export function removeEdge(workspace: OrbitWorkspace, id: string): OrbitWorkspac
   };
 }
 
+/** Shortest path (fewest hops) as edge ids. Connections are directional unless `directed` is false. */
 export function findPathEdges(
   edges: DiagramEdge[],
   sourceId: string,
   targetId: string,
+  directed = true,
 ): string[] | null {
   if (sourceId === targetId) return null;
   const adjacency = new Map<string, { target: string; edgeId: string }[]>();
+  const link = (from: string, to: string, edgeId: string) => {
+    const list = adjacency.get(from) ?? [];
+    list.push({ target: to, edgeId });
+    adjacency.set(from, list);
+  };
   for (const edge of edges) {
-    const list = adjacency.get(edge.source) ?? [];
-    list.push({ target: edge.target, edgeId: edge.id });
-    adjacency.set(edge.source, list);
+    link(edge.source, edge.target, edge.id);
+    if (!directed) link(edge.target, edge.source, edge.id);
   }
 
   const queue: { nodeId: string; path: string[] }[] = [{ nodeId: sourceId, path: [] }];
@@ -295,8 +292,17 @@ export function findPathEdges(
   return null;
 }
 
-export function connectedEdgeIds(edges: DiagramEdge[], nodeId: string): string[] {
-  return edges.filter((edge) => edge.source === nodeId || edge.target === nodeId).map((edge) => edge.id);
+/** Node ids visited by a path, in order, starting at `sourceId`. */
+export function pathNodeIds(edges: DiagramEdge[], sourceId: string, pathEdgeIds: string[]): string[] {
+  const byId = new Map(edges.map((edge) => [edge.id, edge]));
+  const nodes = [sourceId];
+  for (const id of pathEdgeIds) {
+    const edge = byId.get(id);
+    if (!edge) break;
+    const current = nodes[nodes.length - 1];
+    nodes.push(edge.source === current ? edge.target : edge.source);
+  }
+  return nodes;
 }
 
 export function uniqueLabel(existing: string[], base: string): string {
@@ -436,8 +442,4 @@ export function downloadWorkspacePng(
   };
 
   image.src = url;
-}
-
-export function emptyWorkspace() {
-  return createEmptyWorkspace();
 }

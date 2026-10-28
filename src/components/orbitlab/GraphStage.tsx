@@ -207,7 +207,7 @@ export function GraphStage({
     return () => observer.disconnect();
   }, []);
 
-  // On small screens the full diagram should be visible on load.
+  // The full diagram should be visible on load.
   // Runs on [scale, node count] so it survives StrictMode's mount → unmount →
   // mount cycle (which would otherwise cancel a scheduled fit and never retry).
   useEffect(() => {
@@ -218,14 +218,12 @@ export function GraphStage({
     const wrapper = wrapperRef.current;
     if (!wrapper || !wrapper.clientWidth || !wrapper.clientHeight) return;
     if (workspace.nodes.length === 0) return;
-    if (wrapper.clientWidth < 700) {
-      didAutoFitRef.current = true;
-      // Two frames: the first scale measurement may still be batching with
-      // this commit; waiting lets the ref sync and layout settle first.
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => fitToScreenRef.current());
-      });
-    }
+    didAutoFitRef.current = true;
+    // Two frames: the first scale measurement may still be batching with
+    // this commit; waiting lets the ref sync and layout settle first.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => fitToScreenRef.current());
+    });
   }, [scale, workspace.nodes.length]);
 
   const nodeMap = useMemo(
@@ -366,6 +364,12 @@ export function GraphStage({
     })
     .filter((item): item is { edge: OrbitWorkspace["edges"][number]; from: { x: number; y: number }; to: { x: number; y: number } } => item !== null);
 
+  const pathNodes = new Set(
+    workspace.edges
+      .filter((edge) => pathEdgeIds?.includes(edge.id))
+      .flatMap((edge) => [edge.source, edge.target]),
+  );
+
   const isEmpty = workspace.nodes.length === 0;
 
   return (
@@ -480,7 +484,7 @@ export function GraphStage({
                   key={node.id}
                   role="button"
                   tabIndex={0}
-                  className={`orbit-node${isSelected ? " is-selected" : ""}${isConnecting ? " is-connecting" : ""}${draggingId === node.id ? " is-dragging" : ""}`}
+                  className={`orbit-node${isSelected ? " is-selected" : ""}${isConnecting ? " is-connecting" : ""}${draggingId === node.id ? " is-dragging" : ""}${pathNodes.has(node.id) ? " is-on-path" : ""}`}
                   style={{
                     left: node.x,
                     top: node.y,

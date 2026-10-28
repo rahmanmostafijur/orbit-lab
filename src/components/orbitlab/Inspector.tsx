@@ -3,16 +3,21 @@
 import { Trash2, X } from "lucide-react";
 import type {
   ComponentKind,
+  DiagramEdge,
   DiagramSelection,
   OrbitWorkspace,
 } from "@/lib/orbitlab/types";
+
+export type EdgeChanges = Partial<Pick<DiagramEdge, "label" | "note" | "kind" | "protocol">>;
+
+const PROTOCOLS = ["HTTP", "HTTPS", "gRPC", "GraphQL", "WebSocket", "SQL", "Event", "AMQP"];
 import { componentKinds, kindIds } from "@/lib/orbitlab/kinds";
 
 type InspectorProps = {
   workspace: OrbitWorkspace;
   selection: DiagramSelection;
   onUpdateNode: (id: string, changes: { kind?: ComponentKind; label?: string; note?: string }) => void;
-  onUpdateEdge: (id: string, changes: { label?: string; note?: string }) => void;
+  onUpdateEdge: (id: string, changes: EdgeChanges) => void;
   onDeleteSelection: () => void;
   /** Deselect; closes the bottom sheet on small screens. */
   onClose: () => void;
@@ -120,6 +125,37 @@ export function Inspector({
               placeholder="Request, Data, Event..."
               onChange={(event) => onUpdateEdge(edge.id, { label: event.target.value })}
             />
+          </label>
+
+          <label className="field">
+            <span className="field__label">Communication</span>
+            <select
+              value={edge.kind ?? "sync"}
+              onChange={(event) =>
+                onUpdateEdge(edge.id, { kind: event.target.value === "async" ? "async" : undefined })
+              }
+            >
+              <option value="sync">Sync — request / response (solid)</option>
+              <option value="async">Async — event / message (dashed)</option>
+            </select>
+          </label>
+
+          <label className="field">
+            <span className="field__label">Protocol (optional)</span>
+            <input
+              type="text"
+              list="edge-protocols"
+              value={edge.protocol ?? ""}
+              placeholder="HTTP, gRPC, SQL, Event…"
+              onChange={(event) =>
+                onUpdateEdge(edge.id, { protocol: event.target.value || undefined })
+              }
+            />
+            <datalist id="edge-protocols">
+              {PROTOCOLS.map((protocol) => (
+                <option key={protocol} value={protocol} />
+              ))}
+            </datalist>
           </label>
 
           <label className="field">

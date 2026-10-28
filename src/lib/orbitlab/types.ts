@@ -23,7 +23,12 @@ export type DiagramEdge = {
   target: string;
   label: string;
   note: string;
+  /** Async edges (events, queues) draw dashed. Missing = sync. */
+  kind?: EdgeKind;
+  protocol?: string;
 };
+
+export type EdgeKind = "sync" | "async";
 
 export type OrbitWorkspace = {
   name: string;

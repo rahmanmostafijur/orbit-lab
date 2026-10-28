@@ -84,6 +84,8 @@ export function normalizeWorkspace(input: unknown): OrbitWorkspace | null {
             target,
             label: asText(candidate.label) || "Request",
             note: asText(candidate.note),
+            ...(candidate.kind === "async" ? { kind: "async" as const } : {}),
+            ...(asText(candidate.protocol) ? { protocol: asText(candidate.protocol) } : {}),
           };
         })
         .filter((edge): edge is DiagramEdge => edge !== null)
@@ -103,7 +105,15 @@ export function serializeWorkspace(workspace: OrbitWorkspace): string {
       name: workspace.name,
       templateId: workspace.templateId,
       nodes: workspace.nodes.map(({ id, kind, label, note, x, y }) => ({ id, kind, label, note, x, y })),
-      edges: workspace.edges.map(({ id, source, target, label, note }) => ({ id, source, target, label, note })),
+      edges: workspace.edges.map(({ id, source, target, label, note, kind, protocol }) => ({
+        id,
+        source,
+        target,
+        label,
+        note,
+        kind,
+        protocol,
+      })),
     },
     null,
     2,

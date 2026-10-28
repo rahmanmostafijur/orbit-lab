@@ -12,7 +12,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { GraphStage } from "@/components/orbitlab/GraphStage";
-import { Inspector } from "@/components/orbitlab/Inspector";
+import { Inspector, type EdgeChanges } from "@/components/orbitlab/Inspector";
 import { FlowTrace, type TraceState } from "@/components/orbitlab/FlowTrace";
 import { WorkspaceSidebar } from "@/components/orbitlab/WorkspaceSidebar";
 import { DiagramUniverse } from "@/components/orbitlab/DiagramUniverse";
@@ -312,7 +312,7 @@ export function OrbitEditor() {
   );
 
   const handleUpdateEdge = useCallback(
-    (id: string, changes: { label?: string; note?: string }) => {
+    (id: string, changes: EdgeChanges) => {
       apply((current) => updateEdge(current, id, changes), `edge:${id}:${Object.keys(changes).join()}`);
     },
     [apply],

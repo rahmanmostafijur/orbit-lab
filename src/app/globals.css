@@ -4909,3 +4909,35 @@ kbd {
     animation: none;
   }
 }
+
+/* Edge label pills (clickable) and async edges */
+.stage__edge-tag {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.stage__edge-tag rect {
+  fill: rgba(7, 12, 24, 0.92);
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+
+.stage__edge.is-selected .stage__edge-tag rect {
+  stroke: var(--amber);
+}
+
+.stage__edge.is-path .stage__edge-tag rect {
+  stroke: var(--cyan);
+}
+
+.stage__edge-line {
+  fill: none;
+}
+
+.stage__edge-hit {
+  fill: none;
+}
+
+.stage__edge.is-async:not(.is-path) .stage__edge-line {
+  stroke-dasharray: 6 5;
+}

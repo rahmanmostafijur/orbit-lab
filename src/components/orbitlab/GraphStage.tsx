@@ -12,11 +12,10 @@ import {
 import { Maximize, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
 import type { DiagramSelection, OrbitWorkspace } from "@/lib/orbitlab/types";
 import { componentKinds } from "@/lib/orbitlab/kinds";
+import { LABEL_HEIGHT, NODE_HEIGHT, NODE_WIDTH, routeEdges } from "@/lib/orbitlab/edgeRouting";
 
 const SCENE_WIDTH = 1280;
 const SCENE_HEIGHT = 760;
-const NODE_WIDTH = 168;
-const NODE_HEIGHT = 74;
 const DRAG_THRESHOLD = 4;
 const MIN_EFFECTIVE_SCALE = 0.14;
 const MAX_EFFECTIVE_SCALE = 3;
@@ -226,15 +225,6 @@ export function GraphStage({
     });
   }, [scale, workspace.nodes.length]);
 
-  const nodeMap = useMemo(
-    () => new Map(workspace.nodes.map((node) => [node.id, node])),
-    [workspace.nodes],
-  );
-
-  const centerOf = useCallback((node: { x: number; y: number }) => ({
-    x: node.x + NODE_WIDTH / 2,
-    y: node.y + NODE_HEIGHT / 2,
-  }), []);
 
   const sceneCoords = useCallback(
     (clientX: number, clientY: number) => {
@@ -353,16 +343,10 @@ export function GraphStage({
     );
   };
 
-  const edges = workspace.edges
-    .map((edge) => {
-      const source = nodeMap.get(edge.source);
-      const target = nodeMap.get(edge.target);
-      if (!source || !target) return null;
-      const from = centerOf(source);
-      const to = centerOf(target);
-      return { edge, from, to };
-    })
-    .filter((item): item is { edge: OrbitWorkspace["edges"][number]; from: { x: number; y: number }; to: { x: number; y: number } } => item !== null);
+  const routes = useMemo(
+    () => routeEdges(workspace.nodes, workspace.edges),
+    [workspace.nodes, workspace.edges],
+  );
 
   const pathNodes = new Set(
     workspace.edges
@@ -423,42 +407,43 @@ export function GraphStage({
                   <path d="M 0 0 L 10 5 L 0 10 z" className="stage__arrow" />
                 </marker>
               </defs>
-              {edges.map(({ edge, from, to }) => {
+              {workspace.edges.map((edge) => {
+                const route = routes.get(edge.id);
+                if (!route) return null;
                 const isSelected =
                   selection.type === "edge" && selection.id === edge.id;
                 const isPath = pathEdgeIds?.includes(edge.id) ?? false;
+                const select = (event: ReactPointerEvent<SVGElement>) => {
+                  event.stopPropagation();
+                  onEdgeClick(edge.id);
+                };
                 return (
                   <g
                     key={edge.id}
-                    className={`stage__edge${isSelected ? " is-selected" : ""}${isPath ? " is-path" : ""}`}
+                    className={`stage__edge${isSelected ? " is-selected" : ""}${isPath ? " is-path" : ""}${edge.kind === "async" ? " is-async" : ""}`}
                   >
-                    <line
-                      className="stage__edge-hit"
-                      x1={from.x}
-                      y1={from.y}
-                      x2={to.x}
-                      y2={to.y}
-                      onPointerDown={(event) => {
-                        event.stopPropagation();
-                        onEdgeClick(edge.id);
-                      }}
-                    />
-                    <line
-                      className="stage__edge-line"
-                      x1={from.x}
-                      y1={from.y}
-                      x2={to.x}
-                      y2={to.y}
-                      markerEnd="url(#orbit-arrow)"
-                    />
-                    <text
-                      className={`stage__edge-label${isSelected ? " is-selected" : ""}`}
-                      x={(from.x + to.x) / 2}
-                      y={(from.y + to.y) / 2 - 10}
-                      textAnchor="middle"
-                    >
-                      {edge.label}
-                    </text>
+                    <path className="stage__edge-hit" d={route.d} onPointerDown={select} />
+                    <path className="stage__edge-line" d={route.d} markerEnd="url(#orbit-arrow)" />
+                    {edge.label ? (
+                      <g className="stage__edge-tag" onPointerDown={select}>
+                        <rect
+                          x={route.label.x - route.labelWidth / 2}
+                          y={route.label.y - LABEL_HEIGHT / 2}
+                          width={route.labelWidth}
+                          height={LABEL_HEIGHT}
+                          rx={LABEL_HEIGHT / 2}
+                        />
+                        <text
+                          className={`stage__edge-label${isSelected ? " is-selected" : ""}`}
+                          x={route.label.x}
+                          y={route.label.y}
+                          textAnchor="middle"
+                          dominantBaseline="central"
+                        >
+                          {edge.label}
+                        </text>
+                      </g>
+                    ) : null}
                   </g>
                 );
               })}

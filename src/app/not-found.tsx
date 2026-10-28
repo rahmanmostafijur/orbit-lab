@@ -12,9 +12,6 @@ export const metadata: Metadata = {
 export default function NotFound() {
   return (
     <div className="site">
-      <a className="skip-link" href="#main-content">
-        Skip to content
-      </a>
       <SiteHeader />
       <main id="main-content">
         <section className="section not-found">

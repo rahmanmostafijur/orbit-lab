@@ -12,9 +12,6 @@ export const metadata: Metadata = {
 export default function PlaygroundPage() {
   return (
     <div className="site app-site">
-      <a className="skip-link" href="#main-content">
-        Skip to content
-      </a>
       <SiteHeader />
       <main
         id="main-content"

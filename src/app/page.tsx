@@ -10,9 +10,6 @@ import { componentKinds } from "@/lib/orbitlab/kinds";
 export default function LandingPage() {
   return (
     <div className="site">
-      <a className="skip-link" href="#main-content">
-        Skip to content
-      </a>
       <SiteHeader />
       <main id="main-content">
         <section className="hero" id="home">
@@ -129,6 +126,26 @@ export default function LandingPage() {
         </section>
 
         <section className="section" id="flows">
+          <div className="shell">
+            <p className="micro-label">How it works</p>
+            <ol className="section__grid">
+              <li className="card">
+                <h2>1. Pick a template</h2>
+                <p>Start from a working system, or an empty canvas.</p>
+              </li>
+              <li className="card">
+                <h2>2. Connect and trace</h2>
+                <p>Link components, then trace a request from any source to any destination.</p>
+              </li>
+              <li className="card">
+                <h2>3. Export and share</h2>
+                <p>Download JSON, SVG, or PNG, or copy a link that holds the whole diagram.</p>
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        <section className="section" id="palette">
           <div className="shell">
             <p className="micro-label">Component palette</p>
             <p className="section__intro">

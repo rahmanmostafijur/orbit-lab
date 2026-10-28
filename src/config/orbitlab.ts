@@ -15,9 +15,9 @@ export const orbitConfig = {
   ],
   repositoryUrl: "https://github.com/orbitlab/orbitlab",
   links: [
-    { label: "Overview", href: "#overview" },
-    { label: "Features", href: "#features" },
-    { label: "Flows", href: "#flows" },
+    { label: "Overview", href: "/#overview" },
+    { label: "Features", href: "/#features" },
+    { label: "Flows", href: "/#flows" },
     { label: "Open Playground", href: "/playground", cta: true },
   ] as readonly {
     label: string;

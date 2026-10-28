@@ -13,7 +13,8 @@ export const orbitConfig = {
     "microservices",
     "web application",
   ],
-  repositoryUrl: "https://github.com/orbitlab/orbitlab",
+  repositoryUrl: "https://github.com/rahmanmostafijur/orbit-lab",
+  author: { name: "rahmanmostafijur", url: "https://github.com/rahmanmostafijur" },
   links: [
     { label: "Overview", href: "/#overview" },
     { label: "Features", href: "/#features" },

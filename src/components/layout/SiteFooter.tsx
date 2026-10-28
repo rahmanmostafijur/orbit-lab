@@ -53,7 +53,11 @@ export function SiteFooter() {
           <p>
             © {year} {orbitConfig.name}.
           </p>
-          <p className="site-footer__tech">Next.js / Three.js / R3F</p>
+          <p className="site-footer__tech">
+            Open source (MIT) · Built by{" "}
+            <a href={orbitConfig.author.url}>@{orbitConfig.author.name}</a> ·{" "}
+            <a href={orbitConfig.repositoryUrl}>Star on GitHub</a>
+          </p>
           <a className="site-footer__top" href="#main-content">
             Back to top
             <ArrowUp size={14} strokeWidth={1.7} aria-hidden="true" />

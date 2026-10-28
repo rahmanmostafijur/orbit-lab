@@ -3,6 +3,7 @@ import { ArrowUpRight, Boxes, MousePointerClick, Layers, Share2, Box, Zap, Image
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Universe } from "@/components/three/Universe";
+import { HeroPreview } from "@/components/orbitlab/HeroPreview";
 import { orbitConfig } from "@/config/orbitlab";
 import { workspaceTemplates } from "@/lib/orbitlab/templates";
 import { componentKinds } from "@/lib/orbitlab/kinds";
@@ -16,7 +17,7 @@ export default function LandingPage() {
           <Universe />
           <div className="shell hero__layout">
             <div className="hero__copy">
-              <p className="micro-label">{orbitConfig.name} — {orbitConfig.tagline}</p>
+              <p className="micro-label">Architecture and system-design playground</p>
               <h1>
                 <span className="hero__title-line">Design systems.</span>
                 <span className="hero__title-line">
@@ -28,9 +29,9 @@ export default function LandingPage() {
                 <span className="hero__title-line">Understand how software works.</span>
               </h1>
               <p className="hero__lede">
-                An architecture and system-design playground for engineers, students,
-                and architects — no accounts, no marketing, just working diagrams,
-                animated flows, and reusable templates.
+                Sketch a system, connect it, and watch a request travel through it.
+                Built for students, interview prep and engineers. Free, runs in your
+                browser, nothing is uploaded.
               </p>
               <div className="hero__actions">
                 <Link
@@ -46,10 +47,7 @@ export default function LandingPage() {
                 </Link>
               </div>
             </div>
-            <div className="hero__orbit" aria-hidden="true">
-              <span className="hero__orbit-ring" />
-              <span className="hero__orbit-label">{orbitConfig.name}</span>
-            </div>
+            <HeroPreview />
           </div>
         </section>
 
@@ -102,7 +100,7 @@ export default function LandingPage() {
                 <h2>3D universe view</h2>
                 <p>
                   Rotate your architecture in an optional WebGL universe built with
-                  React Three Fiber — fail-secure if unsupported.
+                  React Three Fiber. Falls back gracefully to 2D if your device cannot run it.
                 </p>
               </article>
               <article className="card">
@@ -175,7 +173,11 @@ export default function LandingPage() {
             </p>
             <div className="section__grid">
               {workspaceTemplates.map((template) => (
-                <article key={template.id} className="card">
+                <Link
+                  key={template.id}
+                  href={`/playground?template=${template.id}`}
+                  className="card card--link"
+                >
                   <h2>{template.name}</h2>
                   <p>{template.summary}</p>
                   <p className="card__meta">
@@ -183,8 +185,54 @@ export default function LandingPage() {
                     <span className="site-footer__marquee-dot" />
                     {template.edges.length} connections
                   </p>
-                </article>
+                  <span className="card__action">
+                    Try this template
+                    <ArrowUpRight size={14} strokeWidth={1.6} aria-hidden="true" />
+                  </span>
+                </Link>
               ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="section" id="faq">
+          <div className="shell">
+            <p className="micro-label">FAQ</p>
+            <div className="faq">
+              <details>
+                <summary>Where is my data stored?</summary>
+                <p>
+                  Only in your browser&apos;s local storage, on this device. Nothing is
+                  uploaded: there is no server and no account. Export JSON to keep a
+                  backup or move a diagram to another device.
+                </p>
+              </details>
+              <details>
+                <summary>What does a share link contain?</summary>
+                <p>
+                  The whole diagram, encoded in the part of the URL after the #. Browsers
+                  never send that part to a server, so the diagram only travels with the
+                  link itself. Anyone with the link can see it.
+                </p>
+              </details>
+              <details>
+                <summary>Is it free? Do I need an account?</summary>
+                <p>Free, with no account and no sign-up. Open the playground and start.</p>
+              </details>
+              <details>
+                <summary>Does it work on my phone or an older laptop?</summary>
+                <p>
+                  Yes. The 2D editor works everywhere, with touch pan and pinch zoom. The
+                  3D view needs WebGL and falls back gracefully to 2D when it is missing.
+                </p>
+              </details>
+              <details>
+                <summary>Is it open source?</summary>
+                <p>
+                  Yes, under the MIT license.{" "}
+                  <a href={orbitConfig.repositoryUrl}>Read the code on GitHub</a>.
+                </p>
+              </details>
             </div>
           </div>
         </section>

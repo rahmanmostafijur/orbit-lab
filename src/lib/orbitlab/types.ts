@@ -27,6 +27,8 @@ export type DiagramEdge = {
 
 export type OrbitWorkspace = {
   name: string;
+  /** Template this workspace was started from; "Reset to template" restores it. */
+  templateId?: string;
   nodes: DiagramNode[];
   edges: DiagramEdge[];
 };

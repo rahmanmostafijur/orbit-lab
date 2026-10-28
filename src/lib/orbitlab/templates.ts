@@ -127,6 +127,7 @@ function buildNodeIds(name: string, kind: ComponentKind, index: number) {
 export function createWorkspaceFromTemplate(template: WorkspaceTemplate): OrbitWorkspace {
   return {
     name: template.name,
+    templateId: template.id,
     nodes: template.nodes.map((node, index) => ({
       id: buildNodeIds(template.id, node.kind, index),
       ...node,

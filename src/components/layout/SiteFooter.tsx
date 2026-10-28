@@ -30,12 +30,6 @@ export function SiteFooter() {
           <nav className="site-footer__nav" aria-label="Footer navigation">
             <p className="micro-label">Navigate</p>
             <ul>
-              <li>
-                <Link href="/">Overview</Link>
-              </li>
-              <li>
-                <Link href="/playground">Playground</Link>
-              </li>
               {orbitConfig.links.map((link) => (
                 <li key={link.href}>
                   <Link href={link.href}>{link.label}</Link>

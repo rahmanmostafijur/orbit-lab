@@ -13,7 +13,6 @@ import {
   ImageDown,
   Layers,
   RotateCcw,
-  Save,
   Upload,
   Waypoints,
   Zap,
@@ -41,15 +40,12 @@ const KIND_ICONS: Record<ComponentKind, LucideIcon> = {
 
 type WorkspaceSidebarProps = {
   workspace: OrbitWorkspace;
-  activeTemplateId: string | null;
   colorFor: (kind: ComponentKind) => string;
   accent: string;
   background: string;
   text: string;
-  status: string | null;
   onUseTemplate: (templateId: string) => void;
   onAddNode: (kind: ComponentKind) => void;
-  onSave: () => void;
   onImport: (file: File) => void;
   onShare: () => void;
   onReset: () => void;
@@ -59,15 +55,12 @@ type WorkspaceSidebarProps = {
 
 export function WorkspaceSidebar({
   workspace,
-  activeTemplateId,
   colorFor,
   accent,
   background,
   text,
-  status,
   onUseTemplate,
   onAddNode,
-  onSave,
   onImport,
   onShare,
   onReset,
@@ -122,7 +115,7 @@ export function WorkspaceSidebar({
             <button
               key={template.id}
               type="button"
-              className={`template-list__item${activeTemplateId === template.id ? " is-active" : ""}`}
+              className={`template-list__item${workspace.templateId === template.id ? " is-active" : ""}`}
               onClick={() => onUseTemplate(template.id)}
             >
               <span className="template-list__name">{template.name}</span>
@@ -135,10 +128,6 @@ export function WorkspaceSidebar({
       <section className="side-block" aria-label="Save, export, and import">
         <p className="micro-label">Actions</p>
         <div className="sidebar-actions">
-          <button type="button" className="button button--ghost" onClick={onSave}>
-            <Save size={15} strokeWidth={1.7} aria-hidden="true" />
-            Save locally
-          </button>
           <button
             type="button"
             className="button button--ghost"
@@ -186,7 +175,13 @@ export function WorkspaceSidebar({
             <ClipboardCopy size={15} strokeWidth={1.7} aria-hidden="true" />
             Share link
           </button>
-          <button type="button" className="button button--ghost" onClick={onReset}>
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={onReset}
+            disabled={!workspace.templateId}
+            title={workspace.templateId ? undefined : "This diagram was not started from a template"}
+          >
             <RotateCcw size={15} strokeWidth={1.7} aria-hidden="true" />
             Reset to template
           </button>
@@ -195,11 +190,9 @@ export function WorkspaceSidebar({
             New empty workspace
           </button>
         </div>
-        {status ? (
-          <p className="side-block__status" aria-live="polite">
-            {status}
-          </p>
-        ) : null}
+        <p className="side-block__status">
+          Autosaves on this device only. Export JSON to keep a backup.
+        </p>
       </section>
     </aside>
   );

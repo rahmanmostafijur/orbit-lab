@@ -326,7 +326,7 @@ export function GraphStage({
     event: ReactKeyboardEvent<HTMLDivElement>,
     node: { id: string; x: number; y: number },
   ) => {
-    const step = event.shiftKey ? 32 : 8;
+    const step = event.altKey ? 1 : event.shiftKey ? 32 : 8;
     let nextX = node.x;
     let nextY = node.y;
 

@@ -14,6 +14,7 @@ export function createId(prefix: string) {
 export function cloneWorkspace(workspace: OrbitWorkspace): OrbitWorkspace {
   return {
     name: workspace.name,
+    templateId: workspace.templateId,
     nodes: workspace.nodes.map((node) => ({ ...node })),
     edges: workspace.edges.map((edge) => ({ ...edge })),
   };
@@ -91,6 +92,7 @@ export function normalizeWorkspace(input: unknown): OrbitWorkspace | null {
 
   return {
     name: asText(raw.name) || "Untitled workspace",
+    templateId: asText(raw.templateId) || undefined,
     nodes,
     edges,
   };
@@ -100,6 +102,7 @@ export function serializeWorkspace(workspace: OrbitWorkspace): string {
   return JSON.stringify(
     {
       name: workspace.name,
+      templateId: workspace.templateId,
       nodes: workspace.nodes.map(({ id, kind, label, note, x, y }) => ({ id, kind, label, note, x, y })),
       edges: workspace.edges.map(({ id, source, target, label, note }) => ({ id, source, target, label, note })),
     },
@@ -184,6 +187,22 @@ export function addNode(
     node,
     workspace: { ...workspace, nodes: [...workspace.nodes, node] },
   };
+}
+
+export function duplicateNode(
+  workspace: OrbitWorkspace,
+  id: string,
+): { node: DiagramNode | null; workspace: OrbitWorkspace } {
+  const original = workspace.nodes.find((node) => node.id === id);
+  if (!original) return { node: null, workspace };
+  const node: DiagramNode = {
+    ...original,
+    id: createId(original.kind),
+    label: uniqueLabel(workspace.nodes.map((entry) => entry.label), original.label),
+    x: original.x + 32,
+    y: original.y + 32,
+  };
+  return { node, workspace: { ...workspace, nodes: [...workspace.nodes, node] } };
 }
 
 export function moveNode(workspace: OrbitWorkspace, id: string, x: number, y: number): OrbitWorkspace {

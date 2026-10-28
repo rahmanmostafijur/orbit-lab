@@ -149,7 +149,7 @@ const urlShortenerEdges: TemplateEdge[] = [
 const chatNodes: TemplateNode[] = [
   { kind: "client", x: 20, y: 300, label: "Chat Client", note: "Keeps one WebSocket open per device." },
   { kind: "gateway", x: 280, y: 300, label: "Load Balancer", note: "Sticky sessions so a socket stays on one server." },
-  { kind: "service", x: 540, y: 160, label: "WebSocket Server", note: "Holds live connections and pushes new messages." },
+  { kind: "service", x: 540, y: 160, label: "Socket Server", note: "Holds live connections and pushes new messages." },
   { kind: "service", x: 540, y: 460, label: "Chat Service", note: "Checks membership and stores messages." },
   { kind: "queue", x: 820, y: 300, label: "Pub/Sub", note: "Routes each message to the server holding the recipient." },
   { kind: "database", x: 820, y: 600, label: "Message Store", note: "Wide-column store, partitioned by conversation id." },

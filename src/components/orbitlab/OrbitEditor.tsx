@@ -183,23 +183,28 @@ export function OrbitEditor() {
         ? window.location.hash
         : null;
       const shared = hash ? decodeWorkspaceFromLink(hash) : null;
+      // Landing page template cards link to /playground?template=<id>.
+      const templateId = new URLSearchParams(window.location.search).get("template");
+      const template = workspaceTemplates.find((entry) => entry.id === templateId);
+      const incoming = shared ?? (template ? createWorkspaceFromTemplate(template) : null);
+      const message = shared ? "Loaded shared diagram from link." : `Loaded template: ${template?.name}.`;
 
       if (saved) {
         setHistory(createHistory(saved));
       }
 
-      if (shared) {
-        // A shared link must not silently overwrite the visitor's own autosaved work.
+      if (incoming) {
+        // A shared link or template link must not silently overwrite the visitor's own autosaved work.
         window.history.replaceState(null, "", window.location.pathname);
         if (saved) {
-          setHistory((current) => commit(current, shared));
-          showToast("Loaded shared diagram from link.", {
+          setHistory((current) => commit(current, incoming));
+          showToast(message, {
             label: "Back to my diagram",
             run: () => setHistory((current) => commit(current, saved)),
           });
         } else {
-          setHistory(createHistory(shared));
-          showToast("Loaded shared diagram from link.");
+          setHistory(createHistory(incoming));
+          showToast(message);
         }
         return;
       }

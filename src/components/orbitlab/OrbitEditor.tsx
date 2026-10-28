@@ -15,6 +15,7 @@ import {
 import { GraphStage, type NodeMove } from "@/components/orbitlab/GraphStage";
 import { Inspector, type EdgeChanges } from "@/components/orbitlab/Inspector";
 import { FlowTrace, type TraceState } from "@/components/orbitlab/FlowTrace";
+import { OnboardingTour } from "@/components/orbitlab/OnboardingTour";
 import { WorkspaceSidebar } from "@/components/orbitlab/WorkspaceSidebar";
 import { DiagramUniverse } from "@/components/orbitlab/DiagramUniverse";
 import { ShortcutsDialog } from "@/components/orbitlab/ShortcutsDialog";
@@ -569,6 +570,7 @@ export function OrbitEditor() {
                   key={entry.id}
                   type="button"
                   className={`workspace-toolbar__mode${active ? " is-active" : ""}`}
+                  data-tour={entry.id}
                   onClick={() => handleModeChange(entry.id)}
                   aria-pressed={active}
                   aria-keyshortcuts={entry.key.toUpperCase()}
@@ -667,6 +669,7 @@ export function OrbitEditor() {
               onEdgeClick={handleEdgeClick}
               onBackgroundClick={handleBackgroundClick}
               onMoveNodes={handleMoveNodes}
+              onUseTemplate={handleUseTemplate}
             />
           ) : (
             <DiagramUniverse
@@ -714,6 +717,7 @@ export function OrbitEditor() {
         </footer>
       </div>
 
+      <OnboardingTour />
       <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <Toast toast={toast} onDismiss={dismissToast} />
     </div>

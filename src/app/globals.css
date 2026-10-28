@@ -3992,10 +3992,23 @@ a {
 .stage__empty {
   position: absolute;
   inset: 0;
+  z-index: 2;
   display: grid;
   place-content: center;
   gap: 8px;
+  padding: 16px;
   text-align: center;
+  pointer-events: none;
+}
+
+.stage__empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  max-width: 520px;
+  margin-top: 6px;
+  pointer-events: auto;
 }
 
 .stage__empty-title {
@@ -5100,4 +5113,51 @@ kbd {
 .label-chips__item:focus-visible {
   outline: 2px solid var(--cyan);
   outline-offset: 2px;
+}
+
+/* First-run tour */
+.tour-card {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 450;
+  display: grid;
+  gap: 8px;
+  width: min(300px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid var(--cyan);
+  border-radius: 16px;
+  background: var(--panel-solid);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  color: var(--ink);
+}
+
+.tour-card__step,
+.tour-card__title,
+.tour-card__body {
+  margin: 0;
+}
+
+.tour-card__title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+
+.tour-card__body {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.tour-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.tour-target {
+  border-radius: 12px;
+  outline: 2px solid var(--cyan);
+  outline-offset: 4px;
 }

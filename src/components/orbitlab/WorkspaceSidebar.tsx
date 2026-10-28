@@ -84,7 +84,7 @@ export function WorkspaceSidebar({
         />
       </label>
 
-      <details className="side-group" open>
+      <details className="side-group" open data-tour="palette">
         <summary className="micro-label">Component palette</summary>
         <div className="palette">
           {kindIds.map((kind) => {
@@ -131,7 +131,7 @@ export function WorkspaceSidebar({
         </div>
       </details>
 
-      <details className="side-group" open>
+      <details className="side-group" open data-tour="export">
         <summary className="micro-label">File</summary>
         <div className="sidebar-actions">
           <button

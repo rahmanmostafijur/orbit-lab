@@ -15,6 +15,7 @@ import { componentKinds } from "@/lib/orbitlab/kinds";
 import { LABEL_HEIGHT, NODE_HEIGHT, NODE_WIDTH, routeEdges } from "@/lib/orbitlab/edgeRouting";
 import { SCENE_HEIGHT, SCENE_WIDTH } from "@/lib/orbitlab/layout";
 import { selectedNodeIds } from "@/lib/orbitlab/model";
+import { workspaceTemplates } from "@/lib/orbitlab/templates";
 
 const DRAG_THRESHOLD = 4;
 const MIN_EFFECTIVE_SCALE = 0.14;
@@ -70,7 +71,11 @@ type GraphStageProps = {
   onEdgeClick: (id: string) => void;
   onBackgroundClick: () => void;
   onMoveNodes: (moves: NodeMove[]) => void;
+  onUseTemplate: (templateId: string) => void;
 };
+
+// One per teaching style: tiers, REST, an interview classic, real-time.
+const EMPTY_STATE_TEMPLATES = ["three-tier", "rest-fastapi", "url-shortener", "chat"];
 
 export function GraphStage({
   workspace,
@@ -82,6 +87,7 @@ export function GraphStage({
   onEdgeClick,
   onBackgroundClick,
   onMoveNodes,
+  onUseTemplate,
 }: GraphStageProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<HTMLDivElement>(null);
@@ -627,16 +633,6 @@ export function GraphStage({
               })}
             </svg>
 
-            {isEmpty ? (
-              <div className="stage__empty">
-                <p className="stage__empty-title">Nothing in orbit yet</p>
-                <p className="stage__empty-hint">
-                  Pick a component from the palette, or load a template to get
-                  started.
-                </p>
-              </div>
-            ) : null}
-
             {marquee ? (
               <div
                 className="stage__marquee"
@@ -696,6 +692,29 @@ export function GraphStage({
           </div>
         </div>
       </div>
+
+      {isEmpty ? (
+        <div className="stage__empty">
+          <p className="stage__empty-title">Nothing in orbit yet</p>
+          <p className="stage__empty-hint">
+            Pick a component from the palette, or start from a template:
+          </p>
+          <div className="stage__empty-actions">
+            {workspaceTemplates
+              .filter((template) => EMPTY_STATE_TEMPLATES.includes(template.id))
+              .map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  className="button button--ghost button--sm"
+                  onClick={() => onUseTemplate(template.id)}
+                >
+                  {template.name}
+                </button>
+              ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="stage-controls">
         <div className="stage-controls__group">

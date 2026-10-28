@@ -476,6 +476,7 @@ export function OrbitEditor() {
         onReset={handleReset}
         onClear={handleClear}
         onRename={handleRename}
+        onNotify={showToast}
       />
 
       <div className="workspace__main">

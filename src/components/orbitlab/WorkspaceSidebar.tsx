@@ -51,6 +51,7 @@ type WorkspaceSidebarProps = {
   onReset: () => void;
   onClear: () => void;
   onRename: (name: string) => void;
+  onNotify: (message: string) => void;
 };
 
 export function WorkspaceSidebar({
@@ -66,6 +67,7 @@ export function WorkspaceSidebar({
   onReset,
   onClear,
   onRename,
+  onNotify,
 }: WorkspaceSidebarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -82,8 +84,8 @@ export function WorkspaceSidebar({
         />
       </label>
 
-      <section className="side-block" aria-label="Component palette">
-        <p className="micro-label">Component palette</p>
+      <details className="side-group" open>
+        <summary className="micro-label">Component palette</summary>
         <div className="palette">
           {kindIds.map((kind) => {
             const Icon = KIND_ICONS[kind];
@@ -106,27 +108,31 @@ export function WorkspaceSidebar({
             );
           })}
         </div>
-      </section>
+      </details>
 
-      <section className="side-block" aria-label="Templates">
-        <p className="micro-label">Starter templates</p>
-        <div className="template-list">
+      <details className="side-group" open>
+        <summary className="micro-label">Start from a template</summary>
+        <div className="template-gallery">
           {workspaceTemplates.map((template) => (
             <button
               key={template.id}
               type="button"
-              className={`template-list__item${workspace.templateId === template.id ? " is-active" : ""}`}
+              className={`template-gallery__item${workspace.templateId === template.id ? " is-active" : ""}`}
               onClick={() => onUseTemplate(template.id)}
+              title={template.summary}
+              aria-pressed={workspace.templateId === template.id}
             >
-              <span className="template-list__name">{template.name}</span>
-              <span className="template-list__summary">{template.summary}</span>
+              <span className="template-gallery__name">{template.name}</span>
+              <span className="template-gallery__meta">
+                {template.nodes.length} components · {template.edges.length} links
+              </span>
             </button>
           ))}
         </div>
-      </section>
+      </details>
 
-      <section className="side-block" aria-label="Save, export, and import">
-        <p className="micro-label">Actions</p>
+      <details className="side-group" open>
+        <summary className="micro-label">File</summary>
         <div className="sidebar-actions">
           <button
             type="button"
@@ -150,7 +156,10 @@ export function WorkspaceSidebar({
           <button
             type="button"
             className="button button--ghost"
-            onClick={() => downloadWorkspaceJson(workspace)}
+            onClick={() => {
+              downloadWorkspaceJson(workspace);
+              onNotify("Exported JSON — keep it as a backup.");
+            }}
           >
             <Download size={15} strokeWidth={1.7} aria-hidden="true" />
             Export JSON
@@ -158,7 +167,10 @@ export function WorkspaceSidebar({
           <button
             type="button"
             className="button button--ghost"
-            onClick={() => downloadWorkspaceSvg(workspace, colorFor, accent, background, text)}
+            onClick={() => {
+              downloadWorkspaceSvg(workspace, colorFor, accent, background, text);
+              onNotify("Exported SVG.");
+            }}
           >
             <ImageDown size={15} strokeWidth={1.7} aria-hidden="true" />
             Export SVG
@@ -166,7 +178,10 @@ export function WorkspaceSidebar({
           <button
             type="button"
             className="button button--ghost"
-            onClick={() => downloadWorkspacePng(workspace, colorFor, accent, background, text)}
+            onClick={() => {
+              downloadWorkspacePng(workspace, colorFor, accent, background, text);
+              onNotify("Exported PNG.");
+            }}
           >
             <ImageDown size={15} strokeWidth={1.7} aria-hidden="true" />
             Export PNG
@@ -175,6 +190,16 @@ export function WorkspaceSidebar({
             <ClipboardCopy size={15} strokeWidth={1.7} aria-hidden="true" />
             Share link
           </button>
+        </div>
+        <p className="side-block__status">
+          Autosaves on this device only. Export JSON to keep a backup.
+        </p>
+      </details>
+
+      <details className="side-group side-group--danger">
+        <summary className="micro-label">Danger zone</summary>
+        <p className="side-group__hint">Both can be undone for a few seconds, or with Ctrl+Z.</p>
+        <div className="sidebar-actions">
           <button
             type="button"
             className="button button--ghost"
@@ -190,10 +215,7 @@ export function WorkspaceSidebar({
             New empty workspace
           </button>
         </div>
-        <p className="side-block__status">
-          Autosaves on this device only. Export JSON to keep a backup.
-        </p>
-      </section>
+      </details>
     </aside>
   );
 }

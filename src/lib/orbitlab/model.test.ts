@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addEdge, findPathEdges, parseWorkspace, pasteNodes, pathNodeIds, removeNode, serializeWorkspace } from "./model.ts";
+import { addEdge, addNode, findPathEdges, parseWorkspace, pasteNodes, pathNodeIds, removeNode, serializeWorkspace } from "./model.ts";
 import type { DiagramEdge, OrbitWorkspace } from "./types.ts";
 
 const edge = (id: string, source: string, target: string): DiagramEdge => ({ id, source, target, label: "", note: "" });
@@ -70,4 +70,28 @@ test("pasteNodes copies nodes with new ids and unique labels, and only the links
   const newEdges = result.workspace.edges.slice(three.edges.length);
   assert.equal(newEdges.length, 1, "only a→b is copied; b→c leaves the selection");
   assert.deepEqual([newEdges[0].source, newEdges[0].target], result.ids);
+});
+
+test("addNode uses a readable default name and numbers it only on collision", () => {
+  const empty: OrbitWorkspace = { name: "n", nodes: [], edges: [] };
+  const first = addNode(empty, "gateway");
+  assert.equal(first.node.label, "API Gateway");
+  assert.equal(addNode(first.workspace, "gateway").node.label, "API Gateway 2");
+  assert.equal(addNode(empty, "fastapi").node.label, "FastAPI Service");
+});
+
+test("addEdge picks a label from the components it connects", () => {
+  const ws: OrbitWorkspace = {
+    name: "n",
+    nodes: [
+      { id: "s", kind: "service", label: "S", note: "", x: 0, y: 0 },
+      { id: "d", kind: "database", label: "D", note: "", x: 0, y: 0 },
+      { id: "q", kind: "queue", label: "Q", note: "", x: 0, y: 0 },
+    ],
+    edges: [],
+  };
+  assert.equal(addEdge(ws, "s", "d").edge?.label, "Read / write");
+  const publish = addEdge(ws, "s", "q").edge;
+  assert.deepEqual([publish?.label, publish?.kind], ["Publish", "async"]);
+  assert.equal(addEdge(ws, "q", "d").edge?.label, "Consume");
 });

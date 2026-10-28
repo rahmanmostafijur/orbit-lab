@@ -22,7 +22,7 @@ const ALIGN_ACTIONS: { mode: AlignMode; label: string }[] = [
 ];
 
 const PROTOCOLS = ["HTTP", "HTTPS", "gRPC", "GraphQL", "WebSocket", "SQL", "Event", "AMQP"];
-import { componentKinds, kindIds } from "@/lib/orbitlab/kinds";
+import { componentKinds, edgeSuggestions, kindIds } from "@/lib/orbitlab/kinds";
 import type { AlignMode } from "@/lib/orbitlab/layout";
 
 type InspectorProps = {
@@ -94,6 +94,7 @@ export function Inspector({
     selection.type === "edge"
       ? workspace.edges.find((candidate) => candidate.id === selection.id) ?? null
       : null;
+  const kindOf = (id: string) => workspace.nodes.find((candidate) => candidate.id === id)?.kind;
 
   if (!node && !edge) {
     return (
@@ -181,6 +182,19 @@ export function Inspector({
               onChange={(event) => onUpdateEdge(edge.id, { label: event.target.value })}
             />
           </label>
+          <div className="label-chips" role="group" aria-label="Suggested labels">
+            {edgeSuggestions(kindOf(edge.source), kindOf(edge.target)).map((label) => (
+              <button
+                key={label}
+                type="button"
+                className="label-chips__item"
+                aria-pressed={edge.label === label}
+                onClick={() => onUpdateEdge(edge.id, { label })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
           <label className="field">
             <span className="field__label">Communication</span>

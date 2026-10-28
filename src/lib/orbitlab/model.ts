@@ -1,4 +1,5 @@
 import type { ComponentKind, DiagramEdge, DiagramNode, DiagramSelection, OrbitWorkspace } from "@/lib/orbitlab/types";
+import { componentKinds, edgeSuggestions } from "./kinds.ts";
 
 export const STORAGE_KEY = "orbitlab.workspace.v1";
 
@@ -175,11 +176,13 @@ export function addNode(
   kind: ComponentKind,
   position?: { x: number; y: number },
 ): { node: DiagramNode; workspace: OrbitWorkspace } {
-  const count = workspace.nodes.filter((node) => node.kind === kind).length;
   const node: DiagramNode = {
     id: createId(kind),
     kind,
-    label: `${kind === "fastapi" ? "FastAPI" : kind} ${count + 1}`,
+    label: uniqueLabel(
+      workspace.nodes.map((existing) => existing.label),
+      componentKinds[kind].defaultName,
+    ),
     note: "",
     x: position?.x ?? 240 + (workspace.nodes.length % 4) * 260,
     y: position?.y ?? 160 + Math.floor(workspace.nodes.length / 4) * 220,
@@ -267,12 +270,16 @@ export function addEdge(
   );
   if (duplicate) return { edge: null, workspace };
 
+  const kindOf = (id: string) => workspace.nodes.find((node) => node.id === id)?.kind;
+  const source = kindOf(sourceId);
+  const target = kindOf(targetId);
   const edge: DiagramEdge = {
     id: createId("edge"),
     source: sourceId,
     target: targetId,
-    label: "Request",
+    label: edgeSuggestions(source, target)[0],
     note: "",
+    ...(source === "queue" || target === "queue" ? { kind: "async" as const } : {}),
   };
   return { edge, workspace: { ...workspace, edges: [...workspace.edges, edge] } };
 }

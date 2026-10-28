@@ -593,7 +593,7 @@ export function OrbitEditor() {
               workspace={workspace}
               selection={selection}
               pathEdgeIds={pathEdgeIds}
-              onSelectNode={(id) => setSelection({ type: "node", id })}
+              onSelectNode={handleNodeClick}
             />
           )}
           {mode === "flow" ? (

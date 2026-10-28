@@ -1,6 +1,7 @@
 "use client";
 
-import { Suspense, useMemo, useRef } from "react";
+import { Suspense, useMemo, useRef, useState, type ComponentRef } from "react";
+import { Pause, Play, RotateCcw } from "lucide-react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Line, OrbitControls, Stars, AdaptiveDpr } from "@react-three/drei";
 import * as THREE from "three";
@@ -31,42 +32,63 @@ function mapNodePosition(node: DiagramNode, index: number): Vector3Tuple {
 // Shared scratch vector — allocated once, mutated in-place each frame.
 const projectVec = new THREE.Vector3();
 
+type LabelRect = { left: number; top: number; right: number; bottom: number };
+
 /**
  * Syncs the DOM label overlay with the 3D camera by projecting node positions
  * to screen space every frame. Writes transforms directly to the DOM (no React
- * re-renders, no portals, no nested React roots).
+ * re-renders, no portals, no nested React roots). Labels are placed nearest
+ * first; one that would collide with an already placed label is hidden, except
+ * the selected node's, which always shows.
  */
 function LabelSync({
   positions,
   labelRefs,
+  selectedId,
 }: {
   positions: Map<string, Vector3Tuple>;
   labelRefs: React.RefObject<Map<string, HTMLButtonElement>>;
+  selectedId: string | null;
 }) {
   useFrame(({ camera, size }) => {
     const refs = labelRefs.current;
     if (!refs) return;
-
+    const visible: { el: HTMLButtonElement; x: number; y: number; z: number; w: number; h: number }[] = [];
     for (const [id, position] of positions) {
       const el = refs.get(id);
       if (!el) continue;
-
       projectVec.set(position[0], position[1], position[2]);
       projectVec.project(camera);
-
-      const behindCamera = projectVec.z > 1 || projectVec.z < -1;
-      if (behindCamera) {
+      if (projectVec.z > 1 || projectVec.z < -1) {
         el.style.visibility = "hidden";
         continue;
       }
-
-      const x = (projectVec.x * 0.5 + 0.5) * size.width;
-      const y = (-projectVec.y * 0.5 + 0.5) * size.height;
-      el.style.visibility = "visible";
-      el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
+      visible.push({
+        el,
+        x: (projectVec.x * 0.5 + 0.5) * size.width,
+        y: (-projectVec.y * 0.5 + 0.5) * size.height,
+        z: id === selectedId ? -Infinity : projectVec.z,
+        w: el.offsetWidth,
+        h: el.offsetHeight,
+      });
+    }
+    visible.sort((a, b) => a.z - b.z);
+    const placed: LabelRect[] = [];
+    for (const label of visible) {
+      const rect = {
+        left: label.x - label.w / 2,
+        top: label.y - label.h / 2,
+        right: label.x + label.w / 2,
+        bottom: label.y + label.h / 2,
+      };
+      const collides = placed.some(
+        (other) => rect.left < other.right && rect.right > other.left && rect.top < other.bottom && rect.bottom > other.top,
+      );
+      label.el.style.visibility = collides ? "hidden" : "visible";
+      label.el.style.transform = `translate3d(${label.x}px, ${label.y}px, 0) translate(-50%, -50%)`;
+      if (!collides) placed.push(rect);
     }
   });
-
   return null;
 }
 
@@ -79,7 +101,19 @@ export default function DiagramUniverseCanvas({
   onSelectNode,
 }: DiagramUniverseCanvasProps) {
   const labelRefs = useRef(new Map<string, HTMLButtonElement>());
+  const controlsRef = useRef<ComponentRef<typeof OrbitControls>>(null);
+  const [autoRotate, setAutoRotate] = useState(!reducedMotion);
   const isLowQuality = quality === "low";
+  const selectedId = selection.type === "node" ? selection.id : null;
+  const pathNodes = useMemo(
+    () =>
+      new Set(
+        workspace.edges
+          .filter((edge) => pathEdgeIds?.includes(edge.id))
+          .flatMap((edge) => [edge.source, edge.target]),
+      ),
+    [workspace.edges, pathEdgeIds],
+  );
 
   const positions = useMemo(
     () => new Map(workspace.nodes.map((node, index) => [node.id, mapNodePosition(node, index)])),
@@ -127,9 +161,10 @@ export default function DiagramUniverseCanvas({
         </Suspense>
 
         <OrbitControls
+          ref={controlsRef}
           enableDamping
           dampingFactor={0.08}
-          autoRotate={!reducedMotion}
+          autoRotate={autoRotate}
           autoRotateSpeed={0.5}
           minDistance={4}
           maxDistance={26}
@@ -154,6 +189,7 @@ export default function DiagramUniverseCanvas({
         {workspace.nodes.map((node) => {
           const meta = componentKinds[node.kind];
           const selected = selection.type === "node" && selection.id === node.id;
+          const onPath = pathNodes.has(node.id);
           return (
             <group key={node.id} position={positions.get(node.id) ?? [0, 0, 0]}>
               <mesh
@@ -167,7 +203,7 @@ export default function DiagramUniverseCanvas({
                 <meshStandardMaterial
                   color="#0a1a2e"
                   emissive={meta.color}
-                  emissiveIntensity={selected ? 1.6 : 0.7}
+                  emissiveIntensity={selected ? 1.6 : onPath ? 1.25 : 0.7}
                   metalness={0.55}
                   roughness={0.3}
                 />
@@ -176,7 +212,7 @@ export default function DiagramUniverseCanvas({
           );
         })}
 
-        <LabelSync positions={positions} labelRefs={labelRefs} />
+        <LabelSync positions={positions} labelRefs={labelRefs} selectedId={selectedId} />
       </Canvas>
 
       {/* DOM label overlay — plain elements, no Portal, no nested React root */}
@@ -191,15 +227,39 @@ export default function DiagramUniverseCanvas({
                 if (el) labelRefs.current.set(node.id, el);
                 else labelRefs.current.delete(node.id);
               }}
-              className="universe-node"
+              className={`universe-node${node.id === selectedId ? " is-selected" : ""}${pathNodes.has(node.id) ? " is-on-path" : ""}`}
               style={{ ["--node-color" as string]: meta.color }}
               onClick={() => onSelectNode(node.id)}
-              aria-label={`Focus ${node.label}`}
+              aria-label={`Select ${node.label}`}
+              aria-pressed={node.id === selectedId}
             >
               {node.label}
             </button>
           );
         })}
+      </div>
+
+      <p className="universe-view__hint">Drag to rotate · scroll to zoom · click a node to select</p>
+      <div className="universe-view__controls">
+        <button
+          type="button"
+          className="stage-control"
+          aria-pressed={autoRotate}
+          aria-label={autoRotate ? "Stop auto-rotate" : "Start auto-rotate"}
+          title={autoRotate ? "Stop auto-rotate" : "Start auto-rotate"}
+          onClick={() => setAutoRotate((on) => !on)}
+        >
+          {autoRotate ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
+        </button>
+        <button
+          type="button"
+          className="stage-control"
+          aria-label="Reset camera"
+          title="Reset camera"
+          onClick={() => controlsRef.current?.reset()}
+        >
+          <RotateCcw aria-hidden="true" />
+        </button>
       </div>
     </div>
   );

@@ -12,7 +12,7 @@ import {
   Spline,
   Undo2,
 } from "lucide-react";
-import { GraphStage } from "@/components/orbitlab/GraphStage";
+import { GraphStage, type NodeMove } from "@/components/orbitlab/GraphStage";
 import { Inspector, type EdgeChanges } from "@/components/orbitlab/Inspector";
 import { FlowTrace, type TraceState } from "@/components/orbitlab/FlowTrace";
 import { WorkspaceSidebar } from "@/components/orbitlab/WorkspaceSidebar";
@@ -22,26 +22,30 @@ import { Toast, type ToastState } from "@/components/orbitlab/Toast";
 import { componentKinds } from "@/lib/orbitlab/kinds";
 import { workspaceTemplates, createWorkspaceFromTemplate, createEmptyWorkspace } from "@/lib/orbitlab/templates";
 import { commit, createHistory, redo, undo } from "@/lib/orbitlab/history";
-import { autoLayout } from "@/lib/orbitlab/layout";
+import { alignNodes, autoLayout, type AlignMode } from "@/lib/orbitlab/layout";
 import {
   addEdge,
   addNode,
   buildShareUrl,
   createId,
   decodeWorkspaceFromLink,
-  duplicateNode,
   findPathEdges,
   loadSavedWorkspace,
   moveNode,
   parseWorkspace,
+  pasteNodes,
   removeEdge,
   removeNode,
   saveWorkspace,
+  selectedNodeIds,
+  selectionOf,
   updateEdge,
   updateNode,
 } from "@/lib/orbitlab/model";
 import type {
   ComponentKind,
+  DiagramEdge,
+  DiagramNode,
   DiagramSelection,
   EditorMode,
   OrbitWorkspace,
@@ -92,6 +96,8 @@ export function OrbitEditor() {
   const toastTimerRef = useRef<number>(0);
   const hydratedRef = useRef(false);
   const saveFailedRef = useRef(false);
+  // In-memory clipboard for Ctrl+C / Ctrl+V; pasteCount offsets repeated pastes.
+  const clipboardRef = useRef<{ nodes: DiagramNode[]; edges: DiagramEdge[]; pasteCount: number } | null>(null);
 
   const showToast = useCallback((message: string, action?: NonNullable<ToastState>["action"]) => {
     setToast({ id: Date.now(), message, action });
@@ -223,15 +229,38 @@ export function OrbitEditor() {
     return () => window.clearTimeout(timer);
   }, [workspace, showToast]);
 
-  const handleMoveNode = useCallback(
-    (id: string, x: number, y: number) => {
-      apply((current) => moveNode(current, id, x, y), `move:${id}`);
+  const handleMoveNodes = useCallback(
+    (moves: NodeMove[]) => {
+      apply(
+        (current) => moves.reduce((next, move) => moveNode(next, move.id, move.x, move.y), current),
+        `move:${moves.map((move) => move.id).join()}`,
+      );
     },
     [apply],
   );
 
+  const handleSelectNodes = useCallback((ids: string[]) => {
+    setSelection((current) => selectionOf([...selectedNodeIds(current), ...ids]));
+  }, []);
+
+  const handleAlign = useCallback(
+    (alignMode: AlignMode) => {
+      const ids = selectedNodeIds(selection);
+      apply((current) => alignNodes(current, ids, alignMode));
+    },
+    [selection, apply],
+  );
+
   const handleNodeClick = useCallback(
-    (id: string) => {
+    (id: string, additive = false) => {
+      if (mode === "edit" && additive) {
+        // Shift-click toggles the node in a multi-selection.
+        setSelection((current) => {
+          const ids = selectedNodeIds(current);
+          return selectionOf(ids.includes(id) ? ids.filter((entry) => entry !== id) : [...ids, id]);
+        });
+        return;
+      }
       setSelection({ type: "node", id });
 
       if (mode === "flow") {
@@ -297,14 +326,42 @@ export function OrbitEditor() {
     [workspace, apply, showToast],
   );
 
+  const selectedNodes = useCallback(() => {
+    const ids = selectedNodeIds(selection);
+    return workspace.nodes.filter((node) => ids.includes(node.id));
+  }, [selection, workspace.nodes]);
+
   const handleDuplicate = useCallback(() => {
-    if (selection.type !== "node") return;
-    const result = duplicateNode(workspace, selection.id);
-    if (!result.node) return;
+    const nodes = selectedNodes();
+    if (!nodes.length) return;
+    const result = pasteNodes(workspace, nodes, workspace.edges);
     apply(() => result.workspace);
-    setSelection({ type: "node", id: result.node.id });
-    showToast(`Duplicated ${result.node.label}.`);
-  }, [selection, workspace, apply, showToast]);
+    setSelection(selectionOf(result.ids));
+    showToast(`Duplicated ${nodes.length === 1 ? nodes[0].label : `${nodes.length} components`}.`);
+  }, [selectedNodes, workspace, apply, showToast]);
+
+  const handleCopy = useCallback(() => {
+    const nodes = selectedNodes();
+    if (!nodes.length) return false;
+    const ids = new Set(nodes.map((node) => node.id));
+    clipboardRef.current = {
+      nodes,
+      edges: workspace.edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target)),
+      pasteCount: 0,
+    };
+    showToast(`Copied ${nodes.length === 1 ? nodes[0].label : `${nodes.length} components`}.`);
+    return true;
+  }, [selectedNodes, workspace.edges, showToast]);
+
+  const handlePaste = useCallback(() => {
+    const clip = clipboardRef.current;
+    if (!clip) return false;
+    clip.pasteCount += 1;
+    const result = pasteNodes(workspace, clip.nodes, clip.edges, 32 * clip.pasteCount);
+    apply(() => result.workspace);
+    setSelection(selectionOf(result.ids));
+    return true;
+  }, [workspace, apply]);
 
   const handleUpdateNode = useCallback(
     (id: string, changes: { label?: string; note?: string; kind?: ComponentKind }) => {
@@ -323,14 +380,20 @@ export function OrbitEditor() {
   const handleDeleteSelection = useCallback(() => {
     if (selection.type === "none") return;
     const previous = workspace;
-    const { id } = selection;
-    const isNode = selection.type === "node";
-    apply((current) => (isNode ? removeNode(current, id) : removeEdge(current, id)));
+    const nodeIds = selectedNodeIds(selection);
+    let message = "Connection removed.";
+    if (nodeIds.length) {
+      apply((current) => nodeIds.reduce(removeNode, current));
+      message =
+        nodeIds.length === 1
+          ? "Component removed along with its connections."
+          : `${nodeIds.length} components removed along with their connections.`;
+    } else if (selection.type === "edge") {
+      const { id } = selection;
+      apply((current) => removeEdge(current, id));
+    }
     setSelection({ type: "none" });
-    showToast(isNode ? "Component removed along with its connections." : "Connection removed.", {
-      label: "Undo",
-      run: () => apply(() => previous),
-    });
+    showToast(message, { label: "Undo", run: () => apply(() => previous) });
   }, [selection, workspace, apply, showToast]);
 
   const handleUseTemplate = useCallback(
@@ -421,6 +484,12 @@ export function OrbitEditor() {
         } else if (key === "d") {
           event.preventDefault();
           handleDuplicate();
+        } else if (key === "c") {
+          // Leave normal text copy alone when the user has text selected.
+          if (window.getSelection()?.isCollapsed === false) return;
+          if (handleCopy()) event.preventDefault();
+        } else if (key === "v") {
+          if (handlePaste()) event.preventDefault();
         }
         return;
       }
@@ -444,7 +513,17 @@ export function OrbitEditor() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [shortcutsOpen, selection, handleUndo, handleRedo, handleDuplicate, handleDeleteSelection, handleModeChange]);
+  }, [
+    shortcutsOpen,
+    selection,
+    handleUndo,
+    handleRedo,
+    handleDuplicate,
+    handleCopy,
+    handlePaste,
+    handleDeleteSelection,
+    handleModeChange,
+  ]);
 
   const colorFor = useCallback(
     (kind: ComponentKind) => componentKinds[kind].color,
@@ -584,9 +663,10 @@ export function OrbitEditor() {
               connectingFrom={mode === "flow" && !trace.to ? trace.from : connectingFrom}
               pathEdgeIds={pathEdgeIds}
               onNodeClick={handleNodeClick}
+              onSelectNodes={handleSelectNodes}
               onEdgeClick={handleEdgeClick}
               onBackgroundClick={handleBackgroundClick}
-              onMoveNode={handleMoveNode}
+              onMoveNodes={handleMoveNodes}
             />
           ) : (
             <DiagramUniverse
@@ -608,6 +688,7 @@ export function OrbitEditor() {
             onUpdateNode={handleUpdateNode}
             onUpdateEdge={handleUpdateEdge}
             onDeleteSelection={handleDeleteSelection}
+            onAlign={handleAlign}
             onClose={handleBackgroundClick}
           />
         </div>

@@ -10,8 +10,20 @@ import type {
 
 export type EdgeChanges = Partial<Pick<DiagramEdge, "label" | "note" | "kind" | "protocol">>;
 
+const ALIGN_ACTIONS: { mode: AlignMode; label: string }[] = [
+  { mode: "left", label: "Align left" },
+  { mode: "center", label: "Align center" },
+  { mode: "right", label: "Align right" },
+  { mode: "top", label: "Align top" },
+  { mode: "middle", label: "Align middle" },
+  { mode: "bottom", label: "Align bottom" },
+  { mode: "distribute-x", label: "Distribute ↔" },
+  { mode: "distribute-y", label: "Distribute ↕" },
+];
+
 const PROTOCOLS = ["HTTP", "HTTPS", "gRPC", "GraphQL", "WebSocket", "SQL", "Event", "AMQP"];
 import { componentKinds, kindIds } from "@/lib/orbitlab/kinds";
+import type { AlignMode } from "@/lib/orbitlab/layout";
 
 type InspectorProps = {
   workspace: OrbitWorkspace;
@@ -19,6 +31,7 @@ type InspectorProps = {
   onUpdateNode: (id: string, changes: { kind?: ComponentKind; label?: string; note?: string }) => void;
   onUpdateEdge: (id: string, changes: EdgeChanges) => void;
   onDeleteSelection: () => void;
+  onAlign: (mode: AlignMode) => void;
   /** Deselect; closes the bottom sheet on small screens. */
   onClose: () => void;
 };
@@ -29,8 +42,50 @@ export function Inspector({
   onUpdateNode,
   onUpdateEdge,
   onDeleteSelection,
+  onAlign,
   onClose,
 }: InspectorProps) {
+  if (selection.type === "nodes") {
+    const canDistribute = selection.ids.length >= 3;
+    return (
+      <section className="panel panel--inspector is-open" aria-label="Inspector">
+        <div className="panel__heading">
+          <p className="micro-label">{selection.ids.length} components selected</p>
+          <div className="panel__actions">
+            <button type="button" className="button button--ghost button--sm" onClick={onDeleteSelection}>
+              <Trash2 size={14} strokeWidth={1.7} aria-hidden="true" />
+              Delete
+            </button>
+            <button
+              type="button"
+              className="button button--ghost button--sm"
+              onClick={onClose}
+              aria-label="Close inspector"
+            >
+              <X size={14} strokeWidth={1.7} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+        <div className="align-grid" role="group" aria-label="Align and distribute">
+          {ALIGN_ACTIONS.map(({ mode, label }) => (
+            <button
+              key={mode}
+              type="button"
+              className="button button--ghost button--sm"
+              disabled={mode.startsWith("distribute") && !canDistribute}
+              onClick={() => onAlign(mode)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="panel__empty">
+          Drag any selected component to move them together. Ctrl+D duplicates, Ctrl+C / Ctrl+V copy and paste.
+        </p>
+      </section>
+    );
+  }
+
   const node =
     selection.type === "node"
       ? workspace.nodes.find((candidate) => candidate.id === selection.id) ?? null

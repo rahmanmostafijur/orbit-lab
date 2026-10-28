@@ -14,6 +14,7 @@ import type { DiagramSelection, OrbitWorkspace } from "@/lib/orbitlab/types";
 import { componentKinds } from "@/lib/orbitlab/kinds";
 import { LABEL_HEIGHT, NODE_HEIGHT, NODE_WIDTH, routeEdges } from "@/lib/orbitlab/edgeRouting";
 import { SCENE_HEIGHT, SCENE_WIDTH } from "@/lib/orbitlab/layout";
+import { selectedNodeIds } from "@/lib/orbitlab/model";
 
 const DRAG_THRESHOLD = 4;
 const MIN_EFFECTIVE_SCALE = 0.14;
@@ -33,22 +34,42 @@ type DragState = {
   origX: number;
   origY: number;
   moved: boolean;
+  /** Shift was held at press: a click toggles the node in the selection. */
+  shift: boolean;
+  /** Everything that moves with this drag (the whole selection when dragging a selected node). */
+  group: { id: string; x: number; y: number }[];
 };
+
+export type NodeMove = { id: string; x: number; y: number };
 
 type PendingView =
   | { kind: "zoom"; ratio: number; anchorX: number; anchorY: number }
   | { kind: "center"; focusX: number; focusY: number; targetScale: number; centerX: number }
   | { kind: "origin" };
 
+const clampX = (x: number) => Math.min(Math.max(x, 8), SCENE_WIDTH - NODE_WIDTH - 8);
+const clampY = (y: number) => Math.min(Math.max(y, 8), SCENE_HEIGHT - NODE_HEIGHT - 8);
+
+function boxFrom(start: { x: number; y: number }, end: { x: number; y: number }) {
+  return {
+    left: Math.min(start.x, end.x),
+    top: Math.min(start.y, end.y),
+    right: Math.max(start.x, end.x),
+    bottom: Math.max(start.y, end.y),
+  };
+}
+
 type GraphStageProps = {
   workspace: OrbitWorkspace;
   selection: DiagramSelection;
   connectingFrom: string | null;
   pathEdgeIds: string[] | null;
-  onNodeClick: (id: string) => void;
+  onNodeClick: (id: string, additive: boolean) => void;
+  /** Drag-box result; adds to the current selection. */
+  onSelectNodes: (ids: string[]) => void;
   onEdgeClick: (id: string) => void;
   onBackgroundClick: () => void;
-  onMoveNode: (id: string, x: number, y: number) => void;
+  onMoveNodes: (moves: NodeMove[]) => void;
 };
 
 export function GraphStage({
@@ -57,9 +78,10 @@ export function GraphStage({
   connectingFrom,
   pathEdgeIds,
   onNodeClick,
+  onSelectNodes,
   onEdgeClick,
   onBackgroundClick,
-  onMoveNode,
+  onMoveNodes,
 }: GraphStageProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<HTMLDivElement>(null);
@@ -244,6 +266,13 @@ export function GraphStage({
       }
     }
     const background = !(event.target as Element).closest(BACKGROUND_EXCLUDE);
+    if (event.shiftKey && event.button === 0 && background) {
+      const start = sceneCoords(event.clientX, event.clientY);
+      marqueeRef.current = { pointerId: event.pointerId, x: start.x, y: start.y };
+      setMarquee({ left: start.x, top: start.y, right: start.x, bottom: start.y });
+      wrapper.setPointerCapture(event.pointerId);
+      return;
+    }
     const forced = event.button === 1 || spaceHeldRef.current;
     if (!forced && !(event.button === 0 && background)) return;
     if (forced) {
@@ -273,6 +302,11 @@ export function GraphStage({
         return;
       }
     }
+    const box = marqueeRef.current;
+    if (box && box.pointerId === event.pointerId) {
+      setMarquee(boxFrom(box, sceneCoords(event.clientX, event.clientY)));
+      return;
+    }
     const pan = panRef.current;
     if (!pan || pan.pointerId !== event.pointerId) return;
     const dx = event.clientX - pan.x;
@@ -289,6 +323,24 @@ export function GraphStage({
   const handlePointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
     touchesRef.current.delete(event.pointerId);
     if (touchesRef.current.size < 2) pinchDistanceRef.current = 0;
+    const box = marqueeRef.current;
+    if (box && box.pointerId === event.pointerId) {
+      marqueeRef.current = null;
+      setMarquee(null);
+      const rect = boxFrom(box, sceneCoords(event.clientX, event.clientY));
+      onSelectNodes(
+        workspace.nodes
+          .filter(
+            (node) =>
+              node.x < rect.right &&
+              node.x + NODE_WIDTH > rect.left &&
+              node.y < rect.bottom &&
+              node.y + NODE_HEIGHT > rect.top,
+          )
+          .map((node) => node.id),
+      );
+      return;
+    }
     const pan = panRef.current;
     if (!pan || pan.pointerId !== event.pointerId) return;
     panRef.current = null;
@@ -298,6 +350,9 @@ export function GraphStage({
   };
 
   const [snapToGrid, setSnapToGrid] = useState(false);
+  const marqueeRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+  const [marquee, setMarquee] = useState<{ left: number; top: number; right: number; bottom: number } | null>(null);
+  const selectedIds = new Set(selectedNodeIds(selection));
 
   const resetView = useCallback(() => {
     if (Math.abs(zoom - 1) < 0.001) {
@@ -371,14 +426,20 @@ export function GraphStage({
       if (!drag.moved && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
         drag.moved = true;
       }
+      if (!drag.moved) return;
       const snap = (value: number) => (snapToGrid ? Math.round(value / GRID_SIZE) * GRID_SIZE : value);
-      const nextX = Math.min(Math.max(snap(drag.origX + dx), 8), SCENE_WIDTH - NODE_WIDTH - 8);
-      const nextY = Math.min(Math.max(snap(drag.origY + dy), 8), SCENE_HEIGHT - NODE_HEIGHT - 8);
-      if (Math.round(nextX) !== drag.origX || Math.round(nextY) !== drag.origY) {
-        onMoveNode(drag.id, nextX, nextY);
-      }
+      // Snap the grabbed node; the rest of the group keeps its offsets.
+      const offsetX = snap(drag.origX + dx) - drag.origX;
+      const offsetY = snap(drag.origY + dy) - drag.origY;
+      onMoveNodes(
+        drag.group.map((node) => ({
+          id: node.id,
+          x: clampX(node.x + offsetX),
+          y: clampY(node.y + offsetY),
+        })),
+      );
     },
-    [onMoveNode, sceneCoords, snapToGrid],
+    [onMoveNodes, sceneCoords, snapToGrid],
   );
 
   useEffect(() => {
@@ -395,7 +456,7 @@ export function GraphStage({
       dragRef.current = null;
       setDraggingId(null);
       if (drag && !drag.moved) {
-        onNodeClick(drag.id);
+        onNodeClick(drag.id, drag.shift);
       }
     };
 
@@ -424,6 +485,11 @@ export function GraphStage({
       origX: node.x,
       origY: node.y,
       moved: false,
+      shift: event.shiftKey,
+      group:
+        selectedIds.has(node.id) && !event.shiftKey
+          ? workspace.nodes.filter((entry) => selectedIds.has(entry.id)).map(({ id, x, y }) => ({ id, x, y }))
+          : [{ id: node.id, x: node.x, y: node.y }],
     };
     // start point is resolved with scene coordinates on first move
     const point = sceneCoords(event.clientX, event.clientY);
@@ -458,11 +524,7 @@ export function GraphStage({
     }
 
     event.preventDefault();
-    onMoveNode(
-      node.id,
-      Math.min(Math.max(nextX, 8), SCENE_WIDTH - NODE_WIDTH - 8),
-      Math.min(Math.max(nextY, 8), SCENE_HEIGHT - NODE_HEIGHT - 8),
-    );
+    onMoveNodes([{ id: node.id, x: clampX(nextX), y: clampY(nextY) }]);
   };
 
   const routes = useMemo(
@@ -575,9 +637,22 @@ export function GraphStage({
               </div>
             ) : null}
 
+            {marquee ? (
+              <div
+                className="stage__marquee"
+                style={{
+                  left: marquee.left,
+                  top: marquee.top,
+                  width: marquee.right - marquee.left,
+                  height: marquee.bottom - marquee.top,
+                }}
+                aria-hidden="true"
+              />
+            ) : null}
+
             {workspace.nodes.map((node) => {
               const kind = componentKinds[node.kind];
-              const isSelected = selection.type === "node" && selection.id === node.id;
+              const isSelected = selectedIds.has(node.id);
               const isConnecting = connectingFrom === node.id;
 
               return (
@@ -598,7 +673,7 @@ export function GraphStage({
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      onNodeClick(node.id);
+                      onNodeClick(node.id, event.shiftKey);
                       return;
                     }
                     handleNodeKeyDown(event, node);

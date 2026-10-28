@@ -63,3 +63,38 @@ export function autoLayout(workspace: OrbitWorkspace): OrbitWorkspace {
 
   return { ...workspace, nodes: workspace.nodes.map((node) => ({ ...node, ...position.get(node.id)! })) };
 }
+
+export type AlignMode = "left" | "center" | "right" | "top" | "middle" | "bottom" | "distribute-x" | "distribute-y";
+
+/** Aligns or evenly distributes the given nodes (by their edges / centers). Others are untouched. */
+export function alignNodes(workspace: OrbitWorkspace, ids: string[], mode: AlignMode): OrbitWorkspace {
+  const chosen = workspace.nodes.filter((node) => ids.includes(node.id));
+  if (chosen.length < 2) return workspace;
+  const xs = chosen.map((node) => node.x);
+  const ys = chosen.map((node) => node.y);
+  const next = new Map<string, { x: number; y: number }>();
+
+  if (mode === "distribute-x" || mode === "distribute-y") {
+    const axis = mode === "distribute-x" ? "x" : "y";
+    const sorted = [...chosen].sort((a, b) => a[axis] - b[axis]);
+    const first = sorted[0][axis];
+    const step = (sorted[sorted.length - 1][axis] - first) / (sorted.length - 1);
+    sorted.forEach((node, index) => next.set(node.id, { x: node.x, y: node.y, [axis]: Math.round(first + index * step) }));
+  } else {
+    const target = {
+      left: Math.min(...xs),
+      center: Math.round((Math.min(...xs) + Math.max(...xs)) / 2),
+      right: Math.max(...xs),
+      top: Math.min(...ys),
+      middle: Math.round((Math.min(...ys) + Math.max(...ys)) / 2),
+      bottom: Math.max(...ys),
+    }[mode];
+    const horizontal = mode === "left" || mode === "center" || mode === "right";
+    for (const node of chosen) next.set(node.id, horizontal ? { x: target, y: node.y } : { x: node.x, y: target });
+  }
+
+  return {
+    ...workspace,
+    nodes: workspace.nodes.map((node) => (next.has(node.id) ? { ...node, ...next.get(node.id)! } : node)),
+  };
+}

@@ -41,6 +41,8 @@ export type OrbitWorkspace = {
 export type DiagramSelection =
   | { type: "none" }
   | { type: "node"; id: string }
+  /** Two or more components (shift-click or drag-box). */
+  | { type: "nodes"; ids: string[] }
   | { type: "edge"; id: string };
 
 export type EditorMode = "edit" | "connect" | "flow";

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SCENE_HEIGHT, SCENE_WIDTH, autoLayout } from "./layout.ts";
+import { SCENE_HEIGHT, SCENE_WIDTH, alignNodes, autoLayout } from "./layout.ts";
 import { NODE_HEIGHT, NODE_WIDTH } from "./edgeRouting.ts";
 import { createWorkspaceFromTemplate, workspaceTemplates } from "./templates.ts";
 import type { OrbitWorkspace } from "./types.ts";
@@ -32,3 +32,21 @@ for (const template of workspaceTemplates) {
     }
   });
 }
+
+test("alignNodes aligns and distributes only the chosen nodes", () => {
+  const ws: OrbitWorkspace = {
+    name: "a",
+    nodes: [
+      { ...node("a"), x: 10, y: 0 },
+      { ...node("b"), x: 50, y: 100 },
+      { ...node("c"), x: 400, y: 30 },
+      { ...node("d"), x: 999, y: 999 },
+    ],
+    edges: [],
+  };
+  const left = alignNodes(ws, ["a", "b", "c"], "left").nodes;
+  assert.deepEqual(left.map((n) => n.x), [10, 10, 10, 999]);
+  const spread = alignNodes(ws, ["a", "b", "c"], "distribute-x").nodes;
+  assert.deepEqual(spread.map((n) => n.x), [10, 205, 400, 999]);
+  assert.equal(alignNodes(ws, ["a"], "top"), ws, "fewer than two nodes is a no-op");
+});

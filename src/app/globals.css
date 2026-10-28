@@ -5053,3 +5053,20 @@ kbd {
     display: none;
   }
 }
+
+/* Drag-box selection and multi-selection inspector */
+.stage__marquee {
+  position: absolute;
+  z-index: 4;
+  border: 1px dashed var(--cyan);
+  border-radius: 4px;
+  background: rgba(126, 232, 255, 0.08);
+  pointer-events: none;
+}
+
+.align-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 12px;
+}

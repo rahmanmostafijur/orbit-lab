@@ -1,4 +1,4 @@
-import type { ComponentKind, DiagramEdge, DiagramNode, OrbitWorkspace } from "@/lib/orbitlab/types";
+import type { ComponentKind, DiagramEdge, DiagramNode, DiagramSelection, OrbitWorkspace } from "@/lib/orbitlab/types";
 
 export const STORAGE_KEY = "orbitlab.workspace.v1";
 
@@ -190,20 +190,46 @@ export function addNode(
   };
 }
 
-export function duplicateNode(
+/**
+ * Adds copies of `nodes` (and of the `edges` that run between them) offset by `offset`,
+ * with fresh ids and unique labels. Used for duplicate and paste.
+ */
+export function pasteNodes(
   workspace: OrbitWorkspace,
-  id: string,
-): { node: DiagramNode | null; workspace: OrbitWorkspace } {
-  const original = workspace.nodes.find((node) => node.id === id);
-  if (!original) return { node: null, workspace };
-  const node: DiagramNode = {
-    ...original,
-    id: createId(original.kind),
-    label: uniqueLabel(workspace.nodes.map((entry) => entry.label), original.label),
-    x: original.x + 32,
-    y: original.y + 32,
+  nodes: DiagramNode[],
+  edges: DiagramEdge[],
+  offset = 32,
+): { ids: string[]; workspace: OrbitWorkspace } {
+  const labels = workspace.nodes.map((node) => node.label);
+  const idMap = new Map<string, string>();
+  const copies = nodes.map((original) => {
+    const node: DiagramNode = {
+      ...original,
+      id: createId(original.kind),
+      label: uniqueLabel(labels, original.label),
+      x: original.x + offset,
+      y: original.y + offset,
+    };
+    labels.push(node.label);
+    idMap.set(original.id, node.id);
+    return node;
+  });
+  const linkCopies = edges
+    .filter((edge) => idMap.has(edge.source) && idMap.has(edge.target))
+    .map((edge) => ({
+      ...edge,
+      id: createId("edge"),
+      source: idMap.get(edge.source)!,
+      target: idMap.get(edge.target)!,
+    }));
+  return {
+    ids: copies.map((node) => node.id),
+    workspace: {
+      ...workspace,
+      nodes: [...workspace.nodes, ...copies],
+      edges: [...workspace.edges, ...linkCopies],
+    },
   };
-  return { node, workspace: { ...workspace, nodes: [...workspace.nodes, node] } };
 }
 
 export function moveNode(workspace: OrbitWorkspace, id: string, x: number, y: number): OrbitWorkspace {
@@ -452,4 +478,18 @@ export function downloadWorkspacePng(
   };
 
   image.src = url;
+}
+
+export function selectedNodeIds(selection: DiagramSelection): string[] {
+  if (selection.type === "node") return [selection.id];
+  if (selection.type === "nodes") return selection.ids;
+  return [];
+}
+
+/** 0 ids → none, 1 → single node, 2+ → multi-selection. */
+export function selectionOf(ids: string[]): DiagramSelection {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return { type: "none" };
+  if (unique.length === 1) return { type: "node", id: unique[0] };
+  return { type: "nodes", ids: unique };
 }

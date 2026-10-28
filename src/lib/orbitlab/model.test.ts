@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addEdge, findPathEdges, parseWorkspace, pathNodeIds, removeNode, serializeWorkspace } from "./model.ts";
+import { addEdge, findPathEdges, parseWorkspace, pasteNodes, pathNodeIds, removeNode, serializeWorkspace } from "./model.ts";
 import type { DiagramEdge, OrbitWorkspace } from "./types.ts";
 
 const edge = (id: string, source: string, target: string): DiagramEdge => ({ id, source, target, label: "", note: "" });
@@ -54,4 +54,20 @@ test("parse rejects junk and drops edges to unknown nodes", () => {
   assert.equal(parseWorkspace("not json"), null);
   const parsed = parseWorkspace(JSON.stringify({ nodes: [{ id: "a", kind: "client" }], edges: [edge("x", "a", "zzz")] }));
   assert.equal(parsed?.edges.length, 0);
+});
+
+test("pasteNodes copies nodes with new ids and unique labels, and only the links between them", () => {
+  const three: OrbitWorkspace = {
+    ...ws,
+    nodes: [...ws.nodes, { id: "c", kind: "cache", label: "C", note: "", x: 0, y: 0 }],
+    edges: [...ws.edges, edge("bc", "b", "c")],
+  };
+  const result = pasteNodes(three, three.nodes.slice(0, 2), three.edges);
+  assert.equal(result.ids.length, 2);
+  const copies = result.workspace.nodes.filter((node) => result.ids.includes(node.id));
+  assert.deepEqual(copies.map((node) => node.label), ["A 2", "B 2"]);
+  assert.deepEqual(copies.map((node) => [node.x, node.y]), [[33, 34], [35, 36]]);
+  const newEdges = result.workspace.edges.slice(three.edges.length);
+  assert.equal(newEdges.length, 1, "only a→b is copied; b→c leaves the selection");
+  assert.deepEqual([newEdges[0].source, newEdges[0].target], result.ids);
 });

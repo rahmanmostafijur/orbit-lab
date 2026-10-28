@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NODE_HEIGHT, NODE_WIDTH, clipToNode, labelHitsNode, routeEdges } from "./edgeRouting.ts";
 import { createWorkspaceFromTemplate, workspaceTemplates } from "./templates.ts";
+import { SCENE_HEIGHT, SCENE_WIDTH } from "./layout.ts";
 
 test("clipToNode lands on the node border", () => {
   const c = { x: 100, y: 100 };
@@ -33,3 +34,14 @@ for (const template of workspaceTemplates) {
     }
   });
 }
+
+test("every template teaches: notes on every component, typed connections, all inside the scene", () => {
+  for (const template of workspaceTemplates) {
+    for (const node of template.nodes) {
+      assert.ok(node.note, `${template.name}: "${node.label}" has no note`);
+      assert.ok(node.x >= 8 && node.x <= SCENE_WIDTH - NODE_WIDTH - 8, `${template.name}: "${node.label}" x`);
+      assert.ok(node.y >= 8 && node.y <= SCENE_HEIGHT - NODE_HEIGHT - 8, `${template.name}: "${node.label}" y`);
+    }
+    for (const edge of template.edges) assert.ok(edge.kind && edge.note, `${template.name}: "${edge.label}" untyped`);
+  }
+});

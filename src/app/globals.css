@@ -3882,11 +3882,23 @@ a {
   box-shadow: var(--shadow-glow);
 }
 
+/* Panned with pointer drag / Space / middle button and zoomed with Ctrl+wheel or pinch,
+   so no scrollbars and the plain wheel keeps scrolling the page. */
 .stage__scroller {
   position: relative;
   width: 100%;
-  overflow: auto;
-  scrollbar-width: thin;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+}
+
+.stage__scroller.is-panning {
+  cursor: grabbing;
+}
+
+.stage-control.is-active {
+  border-color: var(--cyan);
+  color: var(--cyan-bright);
 }
 
 .stage__scroller.is-dragging {

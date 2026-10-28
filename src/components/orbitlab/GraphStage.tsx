@@ -9,18 +9,21 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { Maximize, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
+import { Grid3x3, Maximize, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
 import type { DiagramSelection, OrbitWorkspace } from "@/lib/orbitlab/types";
 import { componentKinds } from "@/lib/orbitlab/kinds";
 import { LABEL_HEIGHT, NODE_HEIGHT, NODE_WIDTH, routeEdges } from "@/lib/orbitlab/edgeRouting";
+import { SCENE_HEIGHT, SCENE_WIDTH } from "@/lib/orbitlab/layout";
 
-const SCENE_WIDTH = 1280;
-const SCENE_HEIGHT = 760;
 const DRAG_THRESHOLD = 4;
 const MIN_EFFECTIVE_SCALE = 0.14;
 const MAX_EFFECTIVE_SCALE = 3;
 const FIT_PADDING = 36;
 const FIT_CONTROL_INSET = 112;
+const WHEEL_ZOOM_SPEED = 0.0025;
+// Half the 48px background grid.
+const GRID_SIZE = 24;
+const BACKGROUND_EXCLUDE = ".orbit-node, .stage__edge-hit, .stage__edge-tag";
 
 type DragState = {
   id: string;
@@ -33,7 +36,7 @@ type DragState = {
 };
 
 type PendingView =
-  | { kind: "zoom"; ratio: number }
+  | { kind: "zoom"; ratio: number; anchorX: number; anchorY: number }
   | { kind: "center"; focusX: number; focusY: number; targetScale: number; centerX: number }
   | { kind: "origin" };
 
@@ -67,7 +70,13 @@ export function GraphStage({
   const didMeasureRef = useRef(false);
   const baseScaleRef = useRef(1);
   const [scale, setScale] = useState(1);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoomState] = useState(1);
+  // Latest requested zoom: wheel and pinch can fire several times before React re-renders.
+  const zoomRef = useRef(1);
+  const setZoom = useCallback((next: number) => {
+    zoomRef.current = next;
+    setZoomState(next);
+  }, []);
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   // baseScaleRef is updated synchronously by the ResizeObserver measure pass,
@@ -75,64 +84,51 @@ export function GraphStage({
   // state mirrors it for rendering (scene size + zoom note).
   const effScale = scale * zoom;
 
-  const applyScroll = useCallback(
-    (
-      kind: PendingView["kind"],
-      ratio: number,
-      focusX: number,
-      focusY: number,
-      targetScale: number,
-      centerX: number,
-    ) => {
-      const wrapper = wrapperRef.current;
-      if (!wrapper) return;
-      if (kind === "zoom") {
-        wrapper.scrollLeft = Math.max(
-          (wrapper.scrollLeft + wrapper.clientWidth / 2) * ratio - wrapper.clientWidth / 2,
-          0,
-        );
-        wrapper.scrollTop = Math.max(
-          (wrapper.scrollTop + wrapper.clientHeight / 2) * ratio - wrapper.clientHeight / 2,
-          0,
-        );
-      } else if (kind === "center") {
-        wrapper.scrollLeft = Math.max(focusX * targetScale - centerX, 0);
-        wrapper.scrollTop = Math.max(focusY * targetScale - wrapper.clientHeight / 2, 0);
-      } else {
-        wrapper.scrollLeft = 0;
-        wrapper.scrollTop = 0;
-      }
-    },
-    [],
-  );
+  const applyScroll = useCallback((view: PendingView) => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    if (view.kind === "zoom") {
+      wrapper.scrollLeft = Math.max((wrapper.scrollLeft + view.anchorX) * view.ratio - view.anchorX, 0);
+      wrapper.scrollTop = Math.max((wrapper.scrollTop + view.anchorY) * view.ratio - view.anchorY, 0);
+    } else if (view.kind === "center") {
+      wrapper.scrollLeft = Math.max(view.focusX * view.targetScale - view.centerX, 0);
+      wrapper.scrollTop = Math.max(view.focusY * view.targetScale - wrapper.clientHeight / 2, 0);
+    } else {
+      wrapper.scrollLeft = 0;
+      wrapper.scrollTop = 0;
+    }
+  }, []);
 
   useEffect(() => {
     const pending = pendingViewRef.current;
     if (!pending) return;
     pendingViewRef.current = null;
-    if (pending.kind === "zoom") {
-      applyScroll("zoom", pending.ratio, 0, 0, 0, 0);
-    } else if (pending.kind === "center") {
-      applyScroll("center", 1, pending.focusX, pending.focusY, pending.targetScale, pending.centerX);
-    } else {
-      applyScroll("origin", 1, 0, 0, 0, 0);
-    }
+    applyScroll(pending);
   }, [applyScroll, zoom]);
 
+  /** Zoom by `factor`, keeping the point under `anchor` (wrapper coordinates) still; defaults to the center. */
   const zoomBy = useCallback(
-    (factor: number) => {
+    (factor: number, anchor?: { x: number; y: number }) => {
       const wrapper = wrapperRef.current;
       if (!wrapper) return;
       const base = baseScaleRef.current;
       const minZoom = MIN_EFFECTIVE_SCALE / base;
       const maxZoom = MAX_EFFECTIVE_SCALE / base;
-      const nextZoom = Math.min(Math.max(zoom * factor, minZoom), maxZoom);
-      const ratio = nextZoom / zoom;
+      const current = zoomRef.current;
+      const nextZoom = Math.min(Math.max(current * factor, minZoom), maxZoom);
+      const ratio = nextZoom / current;
       if (Math.abs(ratio - 1) < 0.001) return;
-      pendingViewRef.current = { kind: "zoom", ratio };
+      // Steps that land before the next render compound into one scroll correction.
+      const pending = pendingViewRef.current;
+      pendingViewRef.current = {
+        kind: "zoom",
+        ratio: pending?.kind === "zoom" ? pending.ratio * ratio : ratio,
+        anchorX: anchor?.x ?? wrapper.clientWidth / 2,
+        anchorY: anchor?.y ?? wrapper.clientHeight / 2,
+      };
       setZoom(nextZoom);
     },
-    [zoom],
+    [setZoom],
   );
 
   const fitToScreen = useCallback(() => {
@@ -167,25 +163,150 @@ export function GraphStage({
     const focusX = minX + (maxX - minX) / 2 + FIT_PADDING / 2;
     const focusY = minY + (maxY - minY) / 2 + FIT_PADDING / 2;
     if (Math.abs(finalScale - effScale) < 0.001) {
-      applyScroll("center", 1, focusX, focusY, finalScale, centerX);
+      applyScroll({ kind: "center", focusX, focusY, targetScale: finalScale, centerX });
       return;
     }
     pendingViewRef.current = { kind: "center", focusX, focusY, targetScale: finalScale, centerX };
     setZoom(nextZoom);
-  }, [applyScroll, effScale, workspace.nodes]);
+  }, [applyScroll, effScale, setZoom, workspace.nodes]);
 
+  const zoomByRef = useRef(zoomBy);
   useEffect(() => {
     fitToScreenRef.current = fitToScreen;
-  }, [fitToScreen]);
+    zoomByRef.current = zoomBy;
+  }, [fitToScreen, zoomBy]);
+
+  // Ctrl/Cmd + wheel (and trackpad pinch, which browsers report as ctrl+wheel) zooms at the cursor.
+  // Plain wheel is left alone so the page keeps scrolling. Batched per frame so fast wheels compound.
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    let factor = 1;
+    let frame = 0;
+    let anchor = { x: 0, y: 0 };
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      const rect = wrapper.getBoundingClientRect();
+      anchor = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      factor *= Math.exp(-event.deltaY * WHEEL_ZOOM_SPEED);
+      if (!frame) {
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          zoomByRef.current(factor, anchor);
+          factor = 1;
+        });
+      }
+    };
+    wrapper.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      wrapper.removeEventListener("wheel", onWheel);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  // Space held = pan mode (like design tools). Ignored while typing or on buttons.
+  const spaceHeldRef = useRef(false);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== " ") return;
+      const target = event.target;
+      if (target instanceof Element && target.closest("input, textarea, select, button, [role=button]")) return;
+      spaceHeldRef.current = event.type === "keydown";
+      if (event.type === "keydown") event.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKey);
+    };
+  }, []);
+
+  const panRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean; background: boolean } | null>(null);
+  const touchesRef = useRef(new Map<number, { x: number; y: number }>());
+  const pinchDistanceRef = useRef(0);
+
+  // Capture phase, so Space/middle-button pans win over node drags.
+  const handlePointerDownCapture = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    if (event.pointerType === "touch") {
+      touchesRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (touchesRef.current.size === 2) {
+        // Second finger: cancel any node drag or pan and start pinching.
+        dragRef.current = null;
+        setDraggingId(null);
+        panRef.current = null;
+        const [a, b] = [...touchesRef.current.values()];
+        pinchDistanceRef.current = Math.hypot(a.x - b.x, a.y - b.y);
+        return;
+      }
+    }
+    const background = !(event.target as Element).closest(BACKGROUND_EXCLUDE);
+    const forced = event.button === 1 || spaceHeldRef.current;
+    if (!forced && !(event.button === 0 && background)) return;
+    if (forced) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    panRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false, background };
+    wrapper.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    if (touchesRef.current.has(event.pointerId)) {
+      touchesRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (touchesRef.current.size === 2) {
+        const [a, b] = [...touchesRef.current.values()];
+        const distance = Math.hypot(a.x - b.x, a.y - b.y);
+        const rect = wrapper.getBoundingClientRect();
+        if (pinchDistanceRef.current) {
+          zoomBy(distance / pinchDistanceRef.current, {
+            x: (a.x + b.x) / 2 - rect.left,
+            y: (a.y + b.y) / 2 - rect.top,
+          });
+        }
+        pinchDistanceRef.current = distance;
+        return;
+      }
+    }
+    const pan = panRef.current;
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    const dx = event.clientX - pan.x;
+    const dy = event.clientY - pan.y;
+    if (!pan.moved && Math.hypot(dx, dy) <= DRAG_THRESHOLD) return;
+    pan.moved = true;
+    wrapper.classList.add("is-panning");
+    wrapper.scrollLeft -= dx;
+    wrapper.scrollTop -= dy;
+    pan.x = event.clientX;
+    pan.y = event.clientY;
+  };
+
+  const handlePointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+    touchesRef.current.delete(event.pointerId);
+    if (touchesRef.current.size < 2) pinchDistanceRef.current = 0;
+    const pan = panRef.current;
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    panRef.current = null;
+    wrapperRef.current?.classList.remove("is-panning");
+    // A press on empty canvas that did not pan is a click: deselect.
+    if (!pan.moved && pan.background && event.type === "pointerup") onBackgroundClick();
+  };
+
+  const [snapToGrid, setSnapToGrid] = useState(false);
 
   const resetView = useCallback(() => {
     if (Math.abs(zoom - 1) < 0.001) {
-      applyScroll("origin", 1, 0, 0, 0, 0);
+      applyScroll({ kind: "origin" });
       return;
     }
     pendingViewRef.current = { kind: "origin" };
     setZoom(1);
-  }, [applyScroll, zoom]);
+  }, [applyScroll, setZoom, zoom]);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -250,13 +371,14 @@ export function GraphStage({
       if (!drag.moved && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
         drag.moved = true;
       }
-      const nextX = Math.min(Math.max(drag.origX + dx, 8), SCENE_WIDTH - NODE_WIDTH - 8);
-      const nextY = Math.min(Math.max(drag.origY + dy, 8), SCENE_HEIGHT - NODE_HEIGHT - 8);
+      const snap = (value: number) => (snapToGrid ? Math.round(value / GRID_SIZE) * GRID_SIZE : value);
+      const nextX = Math.min(Math.max(snap(drag.origX + dx), 8), SCENE_WIDTH - NODE_WIDTH - 8);
+      const nextY = Math.min(Math.max(snap(drag.origY + dy), 8), SCENE_HEIGHT - NODE_HEIGHT - 8);
       if (Math.round(nextX) !== drag.origX || Math.round(nextY) !== drag.origY) {
         onMoveNode(drag.id, nextX, nextY);
       }
     },
-    [onMoveNode, sceneCoords],
+    [onMoveNode, sceneCoords, snapToGrid],
   );
 
   useEffect(() => {
@@ -361,11 +483,10 @@ export function GraphStage({
       <div
         ref={wrapperRef}
         className={`stage__scroller${draggingId ? " is-dragging" : ""}`}
-        onPointerDown={(event) => {
-          if (event.target === event.currentTarget) {
-            onBackgroundClick();
-          }
-        }}
+        onPointerDownCapture={handlePointerDownCapture}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
       >
         <div
           className="stage__scene"
@@ -380,11 +501,6 @@ export function GraphStage({
               width: SCENE_WIDTH,
               height: SCENE_HEIGHT,
               transform: `scale(${effScale})`,
-            }}
-            onPointerDown={(event) => {
-              if (event.target === event.currentTarget) {
-                onBackgroundClick();
-              }
             }}
           >
             <svg
@@ -545,6 +661,18 @@ export function GraphStage({
             onClick={resetView}
           >
             <RotateCcw aria-hidden="true" />
+          </button>
+        </div>
+        <div className="stage-controls__group">
+          <button
+            type="button"
+            className={`stage-control${snapToGrid ? " is-active" : ""}`}
+            aria-label="Snap to grid"
+            aria-pressed={snapToGrid}
+            title="Snap to grid"
+            onClick={() => setSnapToGrid((on) => !on)}
+          >
+            <Grid3x3 aria-hidden="true" />
           </button>
         </div>
         <span className="stage-control-note" aria-hidden="true">

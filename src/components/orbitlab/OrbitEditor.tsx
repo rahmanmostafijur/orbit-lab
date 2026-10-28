@@ -6,6 +6,7 @@ import {
   Keyboard,
   Layers,
   MousePointerClick,
+  Network,
   Redo2,
   SlidersHorizontal,
   Spline,
@@ -21,6 +22,7 @@ import { Toast, type ToastState } from "@/components/orbitlab/Toast";
 import { componentKinds } from "@/lib/orbitlab/kinds";
 import { workspaceTemplates, createWorkspaceFromTemplate, createEmptyWorkspace } from "@/lib/orbitlab/templates";
 import { commit, createHistory, redo, undo } from "@/lib/orbitlab/history";
+import { autoLayout } from "@/lib/orbitlab/layout";
 import {
   addEdge,
   addNode,
@@ -385,6 +387,10 @@ export function OrbitEditor() {
     );
   }, [replaceWithUndo]);
 
+  const handleAutoLayout = useCallback(() => {
+    replaceWithUndo(autoLayout(workspace), "Arranged components left to right.");
+  }, [workspace, replaceWithUndo]);
+
   const handleRename = useCallback(
     (name: string) => {
       apply((current) => ({ ...current, name }), "rename");
@@ -517,6 +523,16 @@ export function OrbitEditor() {
             >
               <Redo2 size={15} strokeWidth={1.7} aria-hidden="true" />
               Redo
+            </button>
+            <button
+              type="button"
+              className="workspace-toolbar__mode"
+              onClick={handleAutoLayout}
+              disabled={workspace.nodes.length < 2}
+              title="Arrange components left to right by their connections"
+            >
+              <Network size={15} strokeWidth={1.7} aria-hidden="true" />
+              Auto-layout
             </button>
           </div>
 
